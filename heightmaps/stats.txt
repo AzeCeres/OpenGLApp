@@ -1,0 +1,9 @@
+heightmap - 
+res- 1920 x 938
+verts - 1'800'960
+hqheightmap -
+res - 3840 x 1876
+verts - 7'203'840
+uhqheightmap -
+res - 7680 - 4320
+verts - 33,177,600

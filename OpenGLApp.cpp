@@ -2,10 +2,8 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-
 #define STB_IMAGE_IMPLEMENTATION
-#include<stb/stb_image.h>
-
+#include <stb/stb_image.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -14,6 +12,8 @@
 
 #include <iostream>
 #include <vector>
+
+#include "Terrain.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int modifiers);
@@ -24,7 +24,7 @@ void processInput(GLFWwindow *window);
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
-const unsigned int NUM_PATCH_PTS = 4;
+
 bool wireframe = false;
 
 // camera - give pretty starting point
@@ -77,11 +77,7 @@ int main()
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
-
-    GLint maxTessLevel;
-    glGetIntegerv(GL_MAX_TESS_GEN_LEVEL, &maxTessLevel);
-    std::cout << "Max available tess level: " << maxTessLevel << std::endl;
-
+    
     // configure global opengl state
     // -----------------------------|
     glEnable(GL_DEPTH_TEST);
@@ -91,7 +87,12 @@ int main()
     //Shader tessHeightMapShader("shaders/midgpuheight.vs", "shaders/gpuheight.fs");
     Shader tessHeightMapShader("shaders/gpuheight.vs", "shaders/gpuheight.fs",
         "shaders/gpuheight.tcs", "shaders/gpuheight.tes");
-    
+    int width, height, nrChannels;
+    unsigned char *data = stbi_load("heightmaps/heightmap.png", &width, &height, &nrChannels, 0);
+    Terrain terrain(data, width, height, nrChannels, 20, 2, &tessHeightMapShader);
+    stbi_image_free(data);
+    //Terrain terrain("heightmaps/hqheightmap.png", 40, 2, &tessHeightMapShader);
+    //Terrain terrain("heightmaps/uhqheightmap.png", 40, 4, &tessHeightMapShader);
     // load and create a texture
     // -------------------------    
     unsigned int texture;
@@ -104,96 +105,7 @@ int main()
     // set texture filtering parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // load image, create texture and generate mipmaps
-    int width, height, nrChannels;
-    // The FileSystem::getPath(...) is part of the GitHub repository so we can find files on any IDE/platform; replace it with your own image path.
-    //heightmap - res- 1920 x 938 - verts - 1'800'960
-    //unsigned char *data = stbi_load("heightmaps/heightmap.png", &width, &height, &nrChannels, 0);
-    //hqheightmap - res - 3840 x 1876 - verts - 7'203'840
-    //unsigned char *data = stbi_load("heightmaps/hqheightmap.png", &width, &height, &nrChannels, 0);
-    // uhqheightmap - res - 7680 - 4320 - verts - 33,177,600 // The area is also stretched out further, rather than just being a higher resolution
-    // this can lead one to perceive the terrain is lower quality than it actually is
-    unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0);
     
-    if (data)
-    {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-
-        tessHeightMapShader.setInt("heightMap", 0);
-        std::cout << "Loaded heightmap of size " << height << " x " << width << std::endl;
-    }
-    else
-    {
-        std::cout << "Failed to load texture" << std::endl;
-    }
-    stbi_image_free(data);
-
-    // set up vertex data (and buffer(s)) and configure vertex attributes
-    // ------------------------------------------------------------------
-    std::vector<float> vertices;
-    unsigned rez = 20;
-    std::cout << "Enter the resolution of the terrain (e.g. 20,40,60)(higher is recommended for larger heightmaps): ";
-    std::cin >> rez;
-    if(rez < 1)
-        rez = 1;
-    else if (rez > 120)
-        rez = 120;
-    unsigned sizeDivisor = 1;
-    std::cout << "Enter the size divisor of the terrain (e.g. 1,2,4)(to normalize the size of the maps): ";
-    std::cin >> sizeDivisor;
-    height = height / sizeDivisor;
-    width = width / sizeDivisor;
-    
-    for(unsigned i = 0; i <= rez-1; i++)
-    {
-        for(unsigned j = 0; j <= rez-1; j++)
-        {
-            vertices.push_back(-width/2.0f + width*i/(float)rez); // v.x
-            vertices.push_back(0.0f); // v.y
-            vertices.push_back(-height/2.0f + height*j/(float)rez); // v.z
-            vertices.push_back(i / (float)rez); // u
-            vertices.push_back(j / (float)rez); // v
-
-            vertices.push_back(-width/2.0f + width*(i+1)/(float)rez); // v.x
-            vertices.push_back(0.0f); // v.y
-            vertices.push_back(-height/2.0f + height*j/(float)rez); // v.z
-            vertices.push_back((i+1) / (float)rez); // u
-            vertices.push_back(j / (float)rez); // v
-
-            vertices.push_back(-width/2.0f + width*i/(float)rez); // v.x
-            vertices.push_back(0.0f); // v.y
-            vertices.push_back(-height/2.0f + height*(j+1)/(float)rez); // v.z
-            vertices.push_back(i / (float)rez); // u
-            vertices.push_back((j+1) / (float)rez); // v
-
-            vertices.push_back(-width/2.0f + width*(i+1)/(float)rez); // v.x
-            vertices.push_back(0.0f); // v.y
-            vertices.push_back(-height/2.0f + height*(j+1)/(float)rez); // v.z
-            vertices.push_back((i+1) / (float)rez); // u
-            vertices.push_back((j+1) / (float)rez); // v
-        }
-    }
-    std::cout << "Loaded " << rez*rez << " patches of 4 control points each" << std::endl;
-    std::cout << "Processing " << rez*rez*4 << " vertices in vertex shader" << std::endl;
-
-    // first, configure the cube's VAO (and terrainVBO)
-    unsigned int terrainVAO, terrainVBO;
-    glGenVertexArrays(1, &terrainVAO);
-    glBindVertexArray(terrainVAO);
-
-    glGenBuffers(1, &terrainVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, terrainVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertices.size(), &vertices[0], GL_STATIC_DRAW);
-
-    // position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    // texCoord attribute
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(sizeof(float) * 3));
-    glEnableVertexAttribArray(1);
-
-    glPatchParameteri(GL_PATCH_VERTICES, NUM_PATCH_PTS);
 
     // render loop
     // -----------
@@ -237,8 +149,7 @@ int main()
         {
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
-        glBindVertexArray(terrainVAO);
-        glDrawArrays(GL_PATCHES, 0, NUM_PATCH_PTS*rez*rez);
+       terrain.draw();
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -248,8 +159,7 @@ int main()
 
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------
-    glDeleteVertexArrays(1, &terrainVAO);
-    glDeleteBuffers(1, &terrainVBO);
+    terrain.clear();
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------

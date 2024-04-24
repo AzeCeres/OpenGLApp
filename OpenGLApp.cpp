@@ -89,22 +89,9 @@ int main()
         "shaders/gpuheight.tcs", "shaders/gpuheight.tes");
     int width, height, nrChannels;
     unsigned char *data = stbi_load("heightmaps/heightmap.png", &width, &height, &nrChannels, 0);
-    Terrain terrain(data, width, height, nrChannels, 20, 2, &tessHeightMapShader);
-    stbi_image_free(data);
-    //Terrain terrain("heightmaps/hqheightmap.png", 40, 2, &tessHeightMapShader);
-    //Terrain terrain("heightmaps/uhqheightmap.png", 40, 4, &tessHeightMapShader);
-    // load and create a texture
-    // -------------------------    
-    unsigned int texture;
-    glGenTextures(1, &texture);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
-    // set the texture wrapping parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // set texture filtering parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    Terrain terrain(data, width, height, nrChannels, 20, 1, &tessHeightMapShader);
+    
+   
     
 
     // render loop
@@ -149,7 +136,8 @@ int main()
         {
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
-       terrain.draw();
+        terrain.draw();
+        std::cout << "Height at (" << camera.Position.x << " " << camera.Position.z << "):" << terrain.getHeightAtPoint(camera.Position.x,camera.Position.z) << std::endl;
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -160,6 +148,7 @@ int main()
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------
     terrain.clear();
+    stbi_image_free(data);
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------

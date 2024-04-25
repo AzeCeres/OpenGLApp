@@ -27,4 +27,6 @@ private:
     Shader *tessHeightMapShader;
     unsigned int terrainVAO, terrainVBO;
     unsigned int heightmapTexture;
+    std::vector<float> texelData;
+    void setupTexelData();
 };

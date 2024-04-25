@@ -143,28 +143,17 @@ void Terrain::clear()
 }
 // Function to get the height at a specified point in the heightmap using texture sampling
 float Terrain::getHeightAtPixel(float x, float z) {
-    // Calculate the corresponding texture coordinates
-    float texCoordX = x / static_cast<float>(width);
-    float texCoordZ = z / static_cast<float>(height);
-
-    // Activate the texture unit and bind the heightmap texture
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, heightmapTexture);
-
-    // Sample the texture at the calculated coordinates
-    std::vector<float> texelData(width * height); // Assuming single-channel texture format (GL_RED)
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, texelData.data());
-
+    
     // Convert texture coordinates to pixel coordinates
-    int pixelX = static_cast<int>(texCoordX * width);
-    int pixelZ = static_cast<int>(texCoordZ * height);
-
+    int pixelX = x;
+    int pixelY = z;
+    setupTexelData();
     // Clamp pixel coordinates to valid range
     pixelX = std::max(0, std::min(width - 1, pixelX));
-    pixelZ = std::max(0, std::min(height - 1, pixelZ));
+    pixelY = std::max(0, std::min(height - 1, pixelY));
 
     // Calculate index of the pixel in the texture data
-    int index = pixelZ * width + pixelX;
+    int index = pixelY * width + pixelX;
 
     // Retrieve the height value at the specified point
     float heightValue = texelData[index];
@@ -176,18 +165,16 @@ float Terrain::getHeightAtPoint(float x, float z)
 {
     x += width / 2.0f;
     z += height / 2.0f;
-    return interpolateHeightAtPoint(x,z);
+    //std::cout << x << " " << z <<"\n";
+    return getHeightAtPixel(x,z);
+    //return interpolateHeightAtPoint(x,z);
 }
 
 // Function to interpolate the height at a specified point using barycentric coordinates
 float Terrain::interpolateHeightAtPoint(float x, float z) {
-    // Calculate the corresponding texture coordinates
-    float texCoordX = x / static_cast<float>(width);
-    float texCoordZ = z / static_cast<float>(height);
-
     // Convert texture coordinates to pixel coordinates
-    int pixelX = static_cast<int>(texCoordX * width);
-    int pixelZ = static_cast<int>(texCoordZ * height);
+    int pixelX = x;
+    int pixelZ = z;
 
     // Clamp pixel coordinates to valid range
     pixelX = std::max(0, std::min(width - 1, pixelX));
@@ -199,7 +186,7 @@ float Terrain::interpolateHeightAtPoint(float x, float z) {
     glm::ivec2 pixel3(pixelX, pixelZ + 1);
 
     // Calculate the barycentric coordinates of the point within the triangle
-    glm::vec2 point(texCoordX * width, texCoordZ * height);
+    glm::vec2 point(x,z);
     glm::vec3 barycentric = calculateBarycentricCoordinates(point, pixel1, pixel2, pixel3);
 
     // Retrieve the heights of the three pixels
@@ -215,10 +202,10 @@ float Terrain::interpolateHeightAtPoint(float x, float z) {
 
 // Function to calculate barycentric coordinates of a point within a triangle
 glm::vec3 Terrain::calculateBarycentricCoordinates(const glm::vec2& point, const glm::ivec2& p1, const glm::ivec2& p2, const glm::ivec2& p3) {
-    // Calculate vectors from point to vertices of the triangle
+    // Precompute vectors
     glm::vec2 v0 = p3 - p1;
     glm::vec2 v1 = p2 - p1;
-    glm::vec2 v2 = glm::vec2(point.x - p1.x, point.y - p1.y);
+    glm::vec2 v2 = glm::ivec2(point.x - p1.x, point.y - p1.y);
 
     // Compute dot products
     float dot00 = glm::dot(v0, v0);
@@ -227,12 +214,32 @@ glm::vec3 Terrain::calculateBarycentricCoordinates(const glm::vec2& point, const
     float dot11 = glm::dot(v1, v1);
     float dot12 = glm::dot(v1, v2);
 
+    // Compute determinant
+    float denom = dot00 * dot11 - dot01 * dot01;
+
+    // Check if the triangle is degenerate
+    if (denom == 0)
+        return glm::vec3(0.0f, 0.0f, 0.0f); // Return default barycentric coordinates
+
     // Compute barycentric coordinates
-    float invDenom = 1.0f / (dot00 * dot11 - dot01 * dot01);
+    float invDenom = 1.0f / denom;
     float u = (dot11 * dot02 - dot01 * dot12) * invDenom;
     float v = (dot00 * dot12 - dot01 * dot02) * invDenom;
     float w = 1.0f - u - v;
 
     return glm::vec3(u, v, w);
+}
+
+void Terrain::setupTexelData()
+{
+    if (!texelData.empty()) return;
+    
+    // Activate the texture unit and bind the heightmap texture
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, heightmapTexture);
+
+    // Sample the texture at the calculated coordinates
+    texelData = std::vector<float> (width * height); // Assuming single-channel texture format (GL_RED)
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, texelData.data()); //GL_RGBA
 }
 

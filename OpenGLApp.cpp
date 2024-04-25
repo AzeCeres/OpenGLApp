@@ -88,8 +88,10 @@ int main()
     Shader tessHeightMapShader("shaders/gpuheight.vs", "shaders/gpuheight.fs",
         "shaders/gpuheight.tcs", "shaders/gpuheight.tes");
     int width, height, nrChannels;
-    unsigned char *data = stbi_load("heightmaps/heightmap.png", &width, &height, &nrChannels, 0);
-    Terrain terrain(data, width, height, nrChannels, 20, 1, &tessHeightMapShader);
+    unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0); // rez 15-20, sizediv 1
+    //unsigned char *data = stbi_load("heightmaps/hqheightmap.png", &width, &height, &nrChannels, 0); // rez 20-25, sizediv 2
+    //unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0); // rez 20-25, sizediv 4
+    Terrain terrain(data, width, height, nrChannels, 20, 4, &tessHeightMapShader);
     
    
     
@@ -103,7 +105,7 @@ int main()
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        //std::cout << deltaTime << "ms (" << 1.0f / deltaTime << " FPS)" << std::endl;
+        //std::cout << deltaTime << "ms (" << 1.0f / deltaTime << " FPS)" << std::endl; //
 
         // input
         // -----
@@ -137,8 +139,14 @@ int main()
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
         terrain.draw();
-        std::cout << "Height at (" << camera.Position.x << " " << camera.Position.z << "):" << terrain.getHeightAtPoint(camera.Position.x,camera.Position.z) << std::endl;
-
+        float terrainHeight =terrain.getHeightAtPoint(camera.Position.x,camera.Position.z);
+        if(camera.Position.y < terrainHeight)
+        {
+            std::cout << "Camera below terrain!" << std::endl;
+            camera.Position.y = terrainHeight;
+        }
+        //std::cout << "Height at (" << camera.Position.x << " " << camera.Position.z << "):" << terrain.getHeightAtPoint(camera.Position.x,camera.Position.z) << std::endl;
+        
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);

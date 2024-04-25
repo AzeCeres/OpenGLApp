@@ -9,7 +9,7 @@ public:
     const unsigned int NUM_PATCH_PTS = 4;
     Terrain();
     //Terrain(const char* heightmap, int rezIn, int sizeDivisor, Shader* tessHeightMapShader);
-    Terrain(unsigned char* data, int width, int height, int nrChannels, int rezIn, int sizeDivisor,
+    Terrain(unsigned char* data, int width, int height, int nrChannels, int rezIn, int sizeDivisorIn,
             Shader* tessHeightMapShaderIn);
     void draw();
     void setShader(Shader *shaderIn);
@@ -24,6 +24,7 @@ public:
 private:
     int width;
     int height;
+    int sizeDivisor;
     Shader *tessHeightMapShader;
     unsigned int terrainVAO, terrainVBO;
     unsigned int heightmapTexture;

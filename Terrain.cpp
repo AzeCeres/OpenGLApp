@@ -8,7 +8,7 @@
 //}
 
 
-Terrain::Terrain(unsigned char *data,  int width, int height, int nrChannels, int rezIn, int sizeDivisor, Shader* tessHeightMapShaderIn)
+Terrain::Terrain(unsigned char *data,  int width, int height, int nrChannels, int rezIn, int sizeDivisorIn, Shader* tessHeightMapShaderIn)
 {
     GLint maxTessLevel;
     glGetIntegerv(GL_MAX_TESS_GEN_LEVEL, &maxTessLevel);
@@ -56,6 +56,7 @@ Terrain::Terrain(unsigned char *data,  int width, int height, int nrChannels, in
     // ------------------------------------------------------------------
     std::vector<float> vertices;
     rez = rezIn;
+    sizeDivisor = sizeDivisorIn;
     //(e.g. 20,40,60)(higher is recommended for larger heightmaps): ";
     if(rez < 1)
         rez = 1;
@@ -163,9 +164,14 @@ float Terrain::getHeightAtPixel(float x, float z) {
 
 float Terrain::getHeightAtPoint(float x, float z)
 {
-    x += width / 2.0f;
-    z += height / 2.0f;
-    //std::cout << x << " " << z <<"\n";
+    const auto sizeDiv = static_cast<float>(sizeDivisor);
+    const auto heightF = static_cast<float>(height);
+    const auto widthF  = static_cast<float>(width);
+    x *= sizeDiv;
+    z *= sizeDiv;
+    x += (widthF  / 2.0f);
+    z += (heightF / 2.0f);
+    std::cout << x << " " << z <<"\n";
     return getHeightAtPixel(x,z);
     //return interpolateHeightAtPoint(x,z);
 }

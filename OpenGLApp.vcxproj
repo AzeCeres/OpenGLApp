@@ -137,7 +137,9 @@
   <ItemGroup>
     <ClCompile Include="Dependencies\includes\glm\detail\glm.cpp" />
     <ClCompile Include="glad.c" />
+    <ClCompile Include="las.cpp" />
     <ClCompile Include="OpenGLApp.cpp" />
+    <ClCompile Include="pointcloud.cpp" />
     <ClCompile Include="Terrain.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -428,8 +430,13 @@
     <ClInclude Include="Dependencies\includes\glm\vec4.hpp" />
     <ClInclude Include="Dependencies\includes\glm\vector_relational.hpp" />
     <ClInclude Include="Dependencies\includes\KHR\khrplatform.h" />
+    <ClInclude Include="las.h" />
+    <ClInclude Include="pointcloud.h" />
+    <ClInclude Include="shaderVF.h" />
     <ClInclude Include="shader_t.h" />
     <ClInclude Include="Terrain.h" />
+    <ClInclude Include="Transform.h" />
+    <ClInclude Include="Vertex.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Dependencies\includes\glm\detail\func_common.inl" />
@@ -569,12 +576,6 @@
     <None Include="Dependencies\includes\glm\gtx\vector_query.inl" />
     <None Include="Dependencies\includes\glm\gtx\wrap.inl" />
     <None Include="Dependencies\libs\glfw3.dll" />
-    <Content Include="shader.fs">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="shader.vs">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
   <ItemGroup>
     <None Include="shader.fs" />

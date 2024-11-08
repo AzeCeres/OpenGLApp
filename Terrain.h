@@ -10,9 +10,9 @@ public:
     Terrain();
     //Terrain(const char* heightmap, int rezIn, int sizeDivisor, Shader* tessHeightMapShader);
     Terrain(unsigned char* data, int width, int height, int nrChannels, int rezIn, int sizeDivisorIn,
-            Shader* tessHeightMapShaderIn);
+            ShaderT* tessHeightMapShaderIn);
     void draw();
-    void setShader(Shader *shaderIn);
+    void setShader(ShaderT *shaderIn);
     int rez;
     ~Terrain();
     void clear();
@@ -25,7 +25,7 @@ private:
     int width;
     int height;
     int sizeDivisor;
-    Shader *tessHeightMapShader;
+    ShaderT *tessHeightMapShader;
     unsigned int terrainVAO, terrainVBO;
     unsigned int heightmapTexture;
     std::vector<float> texelData;

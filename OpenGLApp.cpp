@@ -8,13 +8,15 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "shader_t.h"
+#include "shaderVF.h"
 #include "camera.h"
 
 #include <iostream>
 #include <vector>
 
-#include "Terrain.h"
+#include "pointcloud.h"
 
+#include "Terrain.h"
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int modifiers);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -28,9 +30,9 @@ const unsigned int SCR_HEIGHT = 600;
 bool wireframe = false;
 
 // camera - give pretty starting point
-Camera camera(glm::vec3(67.0f, 627.5f, 169.9f),
+Camera camera(glm::vec3(1.5f, 3.0f, 11.5f),
               glm::vec3(0.0f, 1.0f, 0.0f),
-              -128.1f, -42.4f);
+              -101.0f, -14.5f);
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -77,24 +79,32 @@ int main()
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
+
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
     
     // configure global opengl state
     // -----------------------------|
     glEnable(GL_DEPTH_TEST);
-
+    glEnable(GL_CULL_FACE);
+    glDepthMask(GL_TRUE);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_BLEND);
     // build and compile our shader program
     // ------------------------------------
     //Shader tessHeightMapShader("shaders/midgpuheight.vs", "shaders/gpuheight.fs");
-    Shader tessHeightMapShader("shaders/gpuheight.vs", "shaders/gpuheight.fs",
+    ShaderT tessHeightMapShader("shaders/gpuheight.vs", "shaders/gpuheight.fs",
         "shaders/gpuheight.tcs", "shaders/gpuheight.tes");
-    int width, height, nrChannels;
-    unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0); // rez 15-20, sizediv 1
+    ShaderVF noLightShader("shaders/default.vs", "shaders/noLight.fs");
+     //int width, height, nrChannels;
+     //unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0); // rez 15-20, sizediv 1
     //unsigned char *data = stbi_load("heightmaps/hqheightmap.png", &width, &height, &nrChannels, 0); // rez 20-25, sizediv 2
     //unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0); // rez 20-25, sizediv 4
-    Terrain terrain(data, width, height, nrChannels, 20, 4, &tessHeightMapShader);
+     //Terrain terrain(data, width, height, nrChannels, 20, 4, &tessHeightMapShader);
     
-   
-    
+    auto pointCloud = new PointCloud("pointcloud/small.las");
+    pointCloud->set_shader(&noLightShader);
+    pointCloud->hasData();
+    pointCloud->setup();
 
     // render loop
     // -----------
@@ -117,34 +127,40 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // be sure to activate shader when setting uniforms/drawing objects
-        tessHeightMapShader.use();
+        noLightShader.use();
+
+    	//glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
 
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100000.0f);
         glm::mat4 view = camera.GetViewMatrix();
         tessHeightMapShader.setMat4("projection", projection);
         tessHeightMapShader.setMat4("view", view);
+        noLightShader.setMat4("projection", projection);
+        noLightShader.setMat4("view", view);
 
         // world transformation
         glm::mat4 model = glm::mat4(1.0f);
         tessHeightMapShader.setMat4("model", model);
+        noLightShader.setMat4("model", model);
+        pointCloud->draw();
 
         // render the terrain
-        if (wireframe)
-        {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        }
-        else
-        {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        }
-        terrain.draw();
-        float terrainHeight =terrain.getHeightAtPoint(camera.Position.x,camera.Position.z);
-        if(camera.Position.y < terrainHeight)
-        {
-            std::cout << "Camera below terrain!" << std::endl;
-            camera.Position.y = terrainHeight;
-        }
+        //if (wireframe)
+        //{
+        //    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        //}
+        //else
+        //{
+        //    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        //}
+         //terrain.draw();
+         //float terrainHeight =terrain.getHeightAtPoint(camera.Position.x,camera.Position.z);
+         //if(camera.Position.y < terrainHeight)
+         //{
+         //    std::cout << "Camera below terrain!" << std::endl;
+         //    camera.Position.y = terrainHeight;
+         //}
         //std::cout << "Height at (" << camera.Position.x << " " << camera.Position.z << "):" << terrain.getHeightAtPoint(camera.Position.x,camera.Position.z) << std::endl;
         
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -155,8 +171,8 @@ int main()
 
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------
-    terrain.clear();
-    stbi_image_free(data);
+      //terrain.clear();
+      //stbi_image_free(data);
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------

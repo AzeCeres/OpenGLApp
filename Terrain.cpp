@@ -8,7 +8,7 @@
 //}
 
 
-Terrain::Terrain(unsigned char *data,  int width, int height, int nrChannels, int rezIn, int sizeDivisorIn, Shader* tessHeightMapShaderIn)
+Terrain::Terrain(unsigned char *data,  int width, int height, int nrChannels, int rezIn, int sizeDivisorIn, ShaderT* tessHeightMapShaderIn)
 {
     GLint maxTessLevel;
     glGetIntegerv(GL_MAX_TESS_GEN_LEVEL, &maxTessLevel);
@@ -126,7 +126,7 @@ void Terrain::draw()
     glDrawArrays(GL_PATCHES, 0, NUM_PATCH_PTS*rez*rez);
 }
 
-void Terrain::setShader(Shader *shaderIn)
+void Terrain::setShader(ShaderT *shaderIn)
 {
     tessHeightMapShader = shaderIn;
 }

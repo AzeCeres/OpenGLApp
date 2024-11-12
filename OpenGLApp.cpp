@@ -1,5 +1,3 @@
-
-
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #define STB_IMAGE_IMPLEMENTATION
@@ -30,9 +28,9 @@ const unsigned int SCR_HEIGHT = 600;
 bool wireframe = false;
 
 // camera - give pretty starting point
-Camera camera(glm::vec3(1.5f, 3.0f, 11.5f),
+Camera camera(glm::vec3(1.0f, 3.0f, 20.5f),
               glm::vec3(0.0f, 1.0f, 0.0f),
-              -101.0f, -14.5f);
+              -0.0f, -1.f);
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -92,14 +90,14 @@ int main()
     // build and compile our shader program
     // ------------------------------------
     //Shader tessHeightMapShader("shaders/midgpuheight.vs", "shaders/gpuheight.fs");
-    ShaderT tessHeightMapShader("shaders/gpuheight.vs", "shaders/gpuheight.fs",
-        "shaders/gpuheight.tcs", "shaders/gpuheight.tes");
+    //ShaderT tessHeightMapShader("shaders/gpuheight.vs", "shaders/gpuheight.fs",
+    //    "shaders/gpuheight.tcs", "shaders/gpuheight.tes");
     ShaderVF noLightShader("shaders/default.vs", "shaders/noLight.fs");
-     //int width, height, nrChannels;
-     //unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0); // rez 15-20, sizediv 1
+    //int width, height, nrChannels;
+    //unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0); // rez 15-20, sizediv 1
     //unsigned char *data = stbi_load("heightmaps/hqheightmap.png", &width, &height, &nrChannels, 0); // rez 20-25, sizediv 2
     //unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0); // rez 20-25, sizediv 4
-     //Terrain terrain(data, width, height, nrChannels, 20, 4, &tessHeightMapShader);
+	//Terrain terrain(data, width, height, nrChannels, 20, 4, &tessHeightMapShader);
     
     auto pointCloud = new PointCloud("pointcloud/small.las");
     pointCloud->set_shader(&noLightShader);
@@ -128,23 +126,23 @@ int main()
 
         // be sure to activate shader when setting uniforms/drawing objects
         noLightShader.use();
+        //tessHeightMapShader.use();
 
     	//glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
 
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100000.0f);
         glm::mat4 view = camera.GetViewMatrix();
-        tessHeightMapShader.setMat4("projection", projection);
-        tessHeightMapShader.setMat4("view", view);
+        //tessHeightMapShader.setMat4("projection", projection);
+        //tessHeightMapShader.setMat4("view", view);
         noLightShader.setMat4("projection", projection);
         noLightShader.setMat4("view", view);
 
         // world transformation
         glm::mat4 model = glm::mat4(1.0f);
-        tessHeightMapShader.setMat4("model", model);
+        //tessHeightMapShader.setMat4("model", model);
         noLightShader.setMat4("model", model);
-        pointCloud->draw();
-
+        
         // render the terrain
         //if (wireframe)
         //{
@@ -154,13 +152,15 @@ int main()
         //{
         //    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         //}
-         //terrain.draw();
-         //float terrainHeight =terrain.getHeightAtPoint(camera.Position.x,camera.Position.z);
-         //if(camera.Position.y < terrainHeight)
-         //{
-         //    std::cout << "Camera below terrain!" << std::endl;
-         //    camera.Position.y = terrainHeight;
-         //}
+        pointCloud->draw();
+
+        //terrain.draw();
+        //float terrainHeight =terrain.getHeightAtPoint(camera.Position.x,camera.Position.z);
+        //if(camera.Position.y < terrainHeight+1)
+        //{
+        //    std::cout << "Camera below terrain!" << std::endl;
+        //    camera.Position.y = terrainHeight+1;
+        //}
         //std::cout << "Height at (" << camera.Position.x << " " << camera.Position.z << "):" << terrain.getHeightAtPoint(camera.Position.x,camera.Position.z) << std::endl;
         
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -171,8 +171,8 @@ int main()
 
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------
-      //terrain.clear();
-      //stbi_image_free(data);
+    //terrain.clear();
+    //stbi_image_free(data);
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------

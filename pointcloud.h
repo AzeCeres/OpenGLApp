@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include <algorithm>
 #include <string>
 
 #include "las.h"
@@ -9,7 +10,8 @@
 #include "Vertex.h"
 #include "glad/glad.h"
 #include "glm/ext/scalar_constants.hpp"
-
+#include <map>
+#include "Magick++.h"
 class PointCloud
 {
 public:
@@ -43,6 +45,7 @@ public:
     }
     
 private:
+    void convertToImage();
     void pre_render() const
     {
         shader->use();
@@ -104,6 +107,7 @@ private:
 public:
     void setup()
     {
+        convertToImage();
         glGenVertexArrays(1, &VAO);
         glGenBuffers(1, &VBO);
         glGenBuffers(1, &EBO);
@@ -175,3 +179,68 @@ public:
     int get_points_x() { return points_x; }
     int get_points_z() { return points_z; }
 };
+
+inline void PointCloud::convertToImage()
+{
+    std::vector<glm::vec3> points = {};
+    std::map<float, std::vector<glm::vec3>> point_map = {};
+    std::vector<Vertex> vertices = get_vertices();
+    float minZ{(float)INT32_MAX}, maxZ{(float)INT32_MIN}, minX{(float)INT32_MAX}, maxX{(float)INT32_MIN};
+    //Sort all of the vertices into Z-columns
+    for (auto vertex : vertices)
+    {
+        if(vertex.position.z <= minZ)
+            minZ=vertex.position.z;
+        if(vertex.position.z >= maxZ)
+            maxZ=vertex.position.z;
+        //check to see if current Z-value already has a column, if not, create one
+        if (point_map.find(vertex.position.z) == point_map.end())
+        {
+            point_map[vertex.position.z] = {};
+        }
+        //Add vertex position to the correct Z-column
+        point_map[vertex.position.z].push_back(vertex.position);
+    }
+    int lengthZ = maxZ-minZ;
+    // sorts all of the positions by their x-values so that they are all in order
+    for (auto &pair : point_map)
+    {
+        std::sort(pair.second.begin(), pair.second.end(), [](glm::vec3 a, glm::vec3 b)
+                  { return a.x < b.x; });
+    }
+    //size is set to the number of unique z values in point_map
+    auto size = point_map.size();
+    for (int i = 0; i < size; i++)
+    {
+        auto map_index = 0;
+        auto actual_map_index = 0.0f;
+        for (auto it = point_map.begin(); it != point_map.end(); ++it)
+        {
+            if (map_index == i)
+            {
+                actual_map_index = it->first;
+                break;
+            }
+            map_index++;
+        }
+        auto point_map_row = point_map[actual_map_index];
+        for (int j = 0; j < size; j++)
+        {
+            
+            auto curIndex = static_cast<int>(point_map_row.size() * (static_cast<float>(j) / size));
+            if(point_map_row[curIndex].x <= minX)
+                minX=point_map_row[curIndex].x;
+            if(point_map_row[curIndex].x >= maxX)
+                maxX=point_map_row[curIndex].x;
+            points.push_back(point_map_row[curIndex]);
+        }
+    }
+    auto doubleSize = static_cast<double>(size);
+    int lengthX = maxX-minX;
+    float differenceZ = abs(lengthZ-doubleSize);
+    std::cout<< "length Z = " << lengthZ << " Difference = " << differenceZ << " length X = " << lengthX << std::endl;
+    //Magick::Geometry img(doubleSize, );
+    //std::vector<float> knot_vector = BSpline<glm::vec3>::get_knot_vector(size - 1);
+    //auto surface = new BSplineSurface(2, 2, size - 1, size - 1, knot_vector, knot_vector, points, 0.5);
+    //return surface;
+}

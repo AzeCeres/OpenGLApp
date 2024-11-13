@@ -2,16 +2,16 @@
 #include <algorithm>
 #include <string>
 
-#include "las.h"
 #include <glm/gtx/vec_swizzle.hpp>
+#include "las.h"
 
+#include <map>
+#include "CImg.h"
 #include "shaderVF.h"
 #include "Transform.h"
 #include "Vertex.h"
 #include "glad/glad.h"
 #include "glm/ext/scalar_constants.hpp"
-#include <map>
-#include "Magick++.h"
 class PointCloud
 {
 public:
@@ -180,12 +180,13 @@ public:
     int get_points_z() { return points_z; }
 };
 
+
 inline void PointCloud::convertToImage()
 {
     std::vector<glm::vec3> points = {};
     std::map<float, std::vector<glm::vec3>> point_map = {};
     std::vector<Vertex> vertices = get_vertices();
-    float minZ{(float)INT32_MAX}, maxZ{(float)INT32_MIN}, minX{(float)INT32_MAX}, maxX{(float)INT32_MIN};
+    float minZ{(float)INT32_MAX}, maxZ{(float)INT32_MIN}, minX{(float)INT32_MAX}, maxX{(float)INT32_MIN}, minY{(float)INT32_MAX}, maxY{(float)INT32_MIN};
     //Sort all of the vertices into Z-columns
     for (auto vertex : vertices)
     {
@@ -224,22 +225,40 @@ inline void PointCloud::convertToImage()
             map_index++;
         }
         auto point_map_row = point_map[actual_map_index];
+        std::cout << "x points in row "<< actual_map_index << " " <<point_map_row.size() << std::endl;
         for (int j = 0; j < size; j++)
         {
-            
             auto curIndex = static_cast<int>(point_map_row.size() * (static_cast<float>(j) / size));
             if(point_map_row[curIndex].x <= minX)
                 minX=point_map_row[curIndex].x;
             if(point_map_row[curIndex].x >= maxX)
                 maxX=point_map_row[curIndex].x;
+            if(point_map_row[curIndex].y <= minY)
+                minX=point_map_row[curIndex].y;
+            if(point_map_row[curIndex].y >= maxY)
+                maxX=point_map_row[curIndex].y;
             points.push_back(point_map_row[curIndex]);
         }
     }
+    using namespace cimg_library;
     auto doubleSize = static_cast<double>(size);
+    
     int lengthX = maxX-minX;
+    
     float differenceZ = abs(lengthZ-doubleSize);
-    std::cout<< "length Z = " << lengthZ << " Difference = " << differenceZ << " length X = " << lengthX << std::endl;
-    //Magick::Geometry img(doubleSize, );
+    float difPercent = (doubleSize-lengthZ)/abs(lengthZ);
+    std::cout<< "length Z = " << lengthZ << " amount of rows = " << doubleSize << " Difference = " << differenceZ << " difference percentage = " << difPercent*100 << " length X = " << lengthX << std::endl;
+    lengthX *= (1+difPercent);
+    CImg<unsigned char> image;
+    image.assign(64,64,1,3,0).fill(1,1,1,255).resize(lengthX*2,doubleSize*2);
+    
+    image.save_jpeg("heightmap.jpg",100);
+    //InitializeMagick("");
+    //Image heightMap(Geometry(lengthX*2,doubleSize*2), Color(0, 0, 0, 0));
+    //emptyImage.modifyImage();
+    
+    
+    
     //std::vector<float> knot_vector = BSpline<glm::vec3>::get_knot_vector(size - 1);
     //auto surface = new BSplineSurface(2, 2, size - 1, size - 1, knot_vector, knot_vector, points, 0.5);
     //return surface;

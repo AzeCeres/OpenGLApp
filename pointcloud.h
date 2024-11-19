@@ -323,12 +323,9 @@ inline void PointCloud::convertToImage()
     CImgDisplay local(image, "heightmap");
     CImg<float>  newImage;
     newImage = image;
-    //auto isBlue = std::vector<std::vector<bool>>();
-    //isBlue.reserve(imgWidth);
+    std::vector<int> blankRows;
     for (int y = 0; y < newImage.height(); ++y)
     {
-        //isBlue[x] = std::vector<bool>();
-        //isBlue[x].reserve(imgHeight);
         std::vector<int> blueValsInARow;
         for (int x = 0; x < newImage.width(); ++x)
         {
@@ -338,8 +335,8 @@ inline void PointCloud::convertToImage()
             {
                 if(blueValsInARow.empty())
                 {
-                    if (x==0) continue;
-                    blueValsInARow.emplace_back(x-1);
+                    if (x!=0) 
+                        blueValsInARow.emplace_back(x-1);
                 }
                 blueValsInARow.emplace_back(x);
             }
@@ -365,27 +362,48 @@ inline void PointCloud::convertToImage()
                 //check if it only has right red
                 else if (firstBlueVal >= 254.5) //if left is blue, then right is red
                 {
+                    const float color[] = { lastRedVal ,0.f,0.f };
                     for (int i = 0; i <= x; ++i)
                     {
-                        const float color[] = {lastRedVal ,0.f,0.f };
                         newImage.draw_point(i,y, 0, color);
                     }
                 }
-                //check if it only has left red.
-                else
-                {
-                    
-                }
                 blueValsInARow.clear();
             }
+            
             if(blueValsInARow.size() == imgWidth) //check if it only has blue vals
             {
-                //whole row todo Implement a way to go over these rows later. if statement works
+                //whole row todo Implement a way to go over these rows later. if statement works. Mark the rows.
+                blankRows.emplace_back(y);
                 //std::cout << "Blue row" << std::endl;
+            }
+            else if (!blueValsInARow.empty() && x == imgWidth-1)
+            {
+                float firstRedVal = newImage.atXY(blueValsInARow[0],y,0,0);
+                const float color[] = {firstRedVal ,0.f,0.f };
+                for (int i = 0; i <= blueValsInARow.size(); ++i)
+                {
+                    newImage.draw_point(x-i,y, 0, color);
+                }
             }
         }
     }
-    newImage.save_png("heightmapFilled34.png", 8);
+    newImage.save_png("heightmapFilledHor.png", 8);
+    for (int i = 0; i < blankRows.size(); ++i)
+    {
+        for (int x = 0; x < newImage.width(); ++x)
+        {
+            float upperColor = newImage.atXY(x,blankRows[i]-1,0,0);
+            float lowerColor = newImage.atXY(x,blankRows[i]+1,0,0);
+            
+            if(0>=upperColor && 0>=lowerColor) continue; // todo extract hor and vert filling, and add vert max dist filling.
+            
+            float colorVal = (upperColor + lowerColor)/2;
+            const float color[] = {colorVal, 0, 0};
+            newImage.draw_point(x,blankRows[i], 0, color);
+        }
+    }
+    newImage.save_png("heightmapFilledVert.png", 8);
     //InitializeMagick("");
     //Image heightMap(Geometry(lengthX*2,doubleSize*2), Color(0, 0, 0, 0));
     //emptyImage.modifyImage();

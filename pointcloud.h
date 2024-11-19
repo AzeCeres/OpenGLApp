@@ -6,12 +6,26 @@
 #include "las.h"
 
 #include <map>
+#include <numeric>
+
 #include "CImg.h"
 #include "shaderVF.h"
 #include "Transform.h"
 #include "Vertex.h"
 #include "glad/glad.h"
 #include "glm/ext/scalar_constants.hpp"
+template<typename T>
+    T scalarDiff(T startVal, T endVal)
+{
+    return (endVal/startVal);
+}
+template<typename T>
+double getAverage(std::vector<T> const& v) {
+    if (v.empty()) {
+        return 0;
+    }
+    return std::accumulate(v.begin(), v.end(), 0.0) / v.size();
+}
 class PointCloud
 {
 public:
@@ -178,6 +192,7 @@ public:
     ~PointCloud() {}
     int get_points_x() { return points_x; }
     int get_points_z() { return points_z; }
+    
 };
 
 
@@ -194,6 +209,33 @@ inline void PointCloud::convertToImage()
             minZ=vertex.position.z;
         if(vertex.position.z >= maxZ)
             maxZ=vertex.position.z;
+        if(vertex.position.x <= minX)
+            minX=vertex.position.x;
+        if(vertex.position.x >= maxX)
+            maxX=vertex.position.x;
+        if(vertex.position.y <= minY)
+            minY=vertex.position.y;
+        if(vertex.position.y >= maxY)
+            maxY=vertex.position.y;
+    }
+    // Doesn't work for some reason
+    //for (auto vertex : vertices)
+    //{
+    //    //glm::vec3 newPos(vertex.position.x + abs(minX), vertex.position.y + abs(minY), (vertex.position.z + abs(minZ))*2);
+    //    //vertex.position = newPos;
+    //    vertex.position.x += abs(minX);
+    //    vertex.position.y += abs(minY);
+    //    vertex.position.z += abs(minZ);
+    //    vertex.position.z *= 2;
+    //}
+    //minZ+=abs(minZ);
+    //maxZ+=abs(minZ);
+    //minX+=abs(minX);
+    //maxX+=abs(minX);
+    //minY+=abs(minY);
+    //maxY+=abs(minY);
+    for (auto vertex : vertices)
+    {
         //check to see if current Z-value already has a column, if not, create one
         if (point_map.find(vertex.position.z) == point_map.end())
         {
@@ -202,7 +244,6 @@ inline void PointCloud::convertToImage()
         //Add vertex position to the correct Z-column
         point_map[vertex.position.z].push_back(vertex.position);
     }
-    int lengthZ = maxZ-minZ;
     // sorts all of the positions by their x-values so that they are all in order
     for (auto &pair : point_map)
     {
@@ -211,6 +252,28 @@ inline void PointCloud::convertToImage()
     }
     //size is set to the number of unique z values in point_map
     auto size = point_map.size();
+    using namespace cimg_library;
+    auto doubleSize = static_cast<int>(size);
+    
+    int   lengthX = maxX-minX;
+    float lengthY = maxY-minY;
+    int   lengthZ = maxZ-minZ;
+    
+    float differenceZ = abs(lengthZ-doubleSize);
+    float difPercentY = scalarDiff(maxY+abs(minY),255.f); // minY should be 0, maxY should be 255
+    std::cout<< "length Z = " << lengthZ << " amount of rows = " << doubleSize << " Difference = " << differenceZ << " length X = " << lengthX << std::endl;
+    std::cout<< "maxY = " << maxY << " minY = " << minY << " difY = " << difPercentY << " maxY + minY = " << (maxY+abs(minY))*difPercentY << std::endl;
+    
+    const int imgWidth  = lengthX * (scalarDiff(lengthZ, doubleSize) + 1)*2;
+    std::cout << "width: "<<imgWidth << std::endl;
+    const int imgHeight = lengthZ * 2;
+    float xStep = (float)lengthX/(float)imgWidth;
+    CImg<float> image;
+    
+    image.assign((float)imgWidth,(float)imgHeight, 1, 3);
+    const float blue[] = { 0.f,0.f,255.f };
+    image.draw_fill(0,0,0, blue, 1.f);
+    std::cout << lengthX*2 << std::endl;
     for (int i = 0; i < size; i++)
     {
         auto map_index = 0;
@@ -225,34 +288,104 @@ inline void PointCloud::convertToImage()
             map_index++;
         }
         auto point_map_row = point_map[actual_map_index];
+        int imgYPos = (abs(minZ) + actual_map_index)*2;
         std::cout << "x points in row "<< actual_map_index << " " <<point_map_row.size() << std::endl;
+        std::vector<float> xValsToAverage;
+        float currentStep = xStep;
         for (int j = 0; j < size; j++)
         {
             auto curIndex = static_cast<int>(point_map_row.size() * (static_cast<float>(j) / size));
-            if(point_map_row[curIndex].x <= minX)
-                minX=point_map_row[curIndex].x;
-            if(point_map_row[curIndex].x >= maxX)
-                maxX=point_map_row[curIndex].x;
-            if(point_map_row[curIndex].y <= minY)
-                minX=point_map_row[curIndex].y;
-            if(point_map_row[curIndex].y >= maxY)
-                maxX=point_map_row[curIndex].y;
+            float xToImgVal =point_map_row[curIndex].x + abs(minX);
+            if (xToImgVal > currentStep)
+            {
+                float averageHeight = getAverage(xValsToAverage);
+                const float color[]{(abs(minY)+averageHeight)*difPercentY, 0,0};
+                currentStep += xStep;
+                while(xToImgVal >=  currentStep)
+                    currentStep += xStep;
+                image.draw_point((int)(currentStep/xStep)-1,imgYPos, 0, color);
+                xValsToAverage.clear();
+            }
+            if (xToImgVal <= currentStep)
+            {
+                xValsToAverage.emplace_back(point_map_row[curIndex].y);
+            }
+            //image.draw_point(j, (int)(actual_map_index+minZ)*2, );
             points.push_back(point_map_row[curIndex]);
         }
     }
-    using namespace cimg_library;
-    auto doubleSize = static_cast<double>(size);
     
-    int lengthX = maxX-minX;
     
-    float differenceZ = abs(lengthZ-doubleSize);
-    float difPercent = (doubleSize-lengthZ)/abs(lengthZ);
-    std::cout<< "length Z = " << lengthZ << " amount of rows = " << doubleSize << " Difference = " << differenceZ << " difference percentage = " << difPercent*100 << " length X = " << lengthX << std::endl;
-    lengthX *= (1+difPercent);
-    CImg<unsigned char> image;
-    image.assign(64,64,1,3,0).fill(1,1,1,255).resize(lengthX*2,doubleSize*2);
     
-    image.save_jpeg("heightmap.jpg",100);
+    
+    
+    image.save_png("heightmapRaw.png", 8);
+    CImgDisplay local(image, "heightmap");
+    CImg<float>  newImage;
+    newImage = image;
+    //auto isBlue = std::vector<std::vector<bool>>();
+    //isBlue.reserve(imgWidth);
+    for (int y = 0; y < newImage.height(); ++y)
+    {
+        //isBlue[x] = std::vector<bool>();
+        //isBlue[x].reserve(imgHeight);
+        std::vector<int> blueValsInARow;
+        for (int x = 0; x < newImage.width(); ++x)
+        {
+            auto blueVal = newImage.atXY(x,y,0,2);
+            auto redVal = newImage.atXY(x,y,0,0);
+            if (blueVal >= 254.5)
+            {
+                if(blueValsInARow.empty())
+                {
+                    if (x==0) continue;
+                    blueValsInARow.emplace_back(x-1);
+                }
+                blueValsInARow.emplace_back(x);
+            }
+            else
+            {
+                if(blueValsInARow.empty()) continue;
+                blueValsInARow.emplace_back(x);
+                float firstBlueVal = newImage.atXY(blueValsInARow[0],y,0,2);
+                float lastBlueVal = newImage.atXY(blueValsInARow[blueValsInARow.size()-1],y,0,2);
+                float firstRedVal = newImage.atXY(blueValsInARow[0],y,0,0);
+                float lastRedVal = newImage.atXY(blueValsInARow[blueValsInARow.size()-1],y,0,0);
+                //check if it has reds on both sides
+                if(firstBlueVal < 254.5 && lastBlueVal < 254.5) //if neither ends are blue
+                {
+                    for (int i = 1; i < blueValsInARow.size()-1; ++i)
+                    {
+                        float colorVal = std::lerp(firstRedVal,lastRedVal, i/(blueValsInARow.size()-2));
+                        const float color[] = {colorVal ,0.f,0.f };
+                        newImage.draw_point((x-(blueValsInARow.size()-1))+i,y, 0, color);
+                    }
+                    
+                }
+                //check if it only has right red
+                else if (firstBlueVal >= 254.5) //if left is blue, then right is red
+                {
+                    for (int i = 0; i <= x; ++i)
+                    {
+                        const float color[] = {lastRedVal ,0.f,0.f };
+                        newImage.draw_point(i,y, 0, color);
+                    }
+                }
+                //check if it only has left red.
+                else
+                {
+                    
+                }
+                blueValsInARow.clear();
+            }
+            if(blueValsInARow.size() == imgWidth) //check if it only has blue vals
+            {
+                //whole row todo Implement a way to go over these rows later. if statement works
+                //std::cout << "Blue row" << std::endl;
+            }
+        }
+    }
+    newImage.save_png("heightmapFilled34.png", 8);
     //InitializeMagick("");
     //Image heightMap(Geometry(lengthX*2,doubleSize*2), Color(0, 0, 0, 0));
     //emptyImage.modifyImage();

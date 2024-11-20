@@ -59,6 +59,9 @@ public:
     }
     
 private:
+    cimg_library::CImg<float> vertConnect(cimg_library::CImg<float> newImage, std::vector<int>* blankRows);
+    cimg_library::CImg<float> horzConnect(cimg_library::CImg<float> newImage, std::vector<int>* rowsToFill,
+                                          std::vector<int>* filledRows, int maxBlanks);
     void convertToImage();
     void pre_render() const
     {
@@ -196,6 +199,140 @@ public:
 };
 
 
+cimg_library::CImg<float> PointCloud::vertConnect(cimg_library::CImg<float> newImage, std::vector<int>* blankRows)
+{
+    for (int i = 0; i < blankRows->size(); ++i)
+    {
+        for (int x = 0; x < newImage.width(); ++x)
+        {
+            float blueValXY = newImage.atXY(x,blankRows->at(i),0,2);
+            if ( blueValXY < 254.5) continue; // if it isn't blue, no need to fill
+            float upperColor;
+            float lowerColor;
+            if (blankRows->at(i) == 0)
+            {
+                lowerColor = newImage.atXY(x,blankRows->at(i)+1,0,0);
+                upperColor = lowerColor;
+            }
+            else if ((blankRows->at(i) == newImage.height()-1))
+            {
+                upperColor = newImage.atXY(x,blankRows->at(i)-1,0,0);
+                lowerColor = upperColor;
+            }
+            else
+            {
+                upperColor = newImage.atXY(x,blankRows->at(i)-1,0,0);
+                lowerColor = newImage.atXY(x,blankRows->at(i)+1,0,0);
+            }
+            if(0.1f>=upperColor || 0.1f>=lowerColor) continue;
+            
+            float colorVal = (upperColor + lowerColor)/2;
+            const float color[] = {colorVal, 0, 0};
+            newImage.draw_point(x,blankRows->at(i), 0, color);
+        }
+    }
+    newImage.save_png("tempHeightVert.png", 8);
+    return newImage;
+}
+
+cimg_library::CImg<float> PointCloud::horzConnect(cimg_library::CImg<float> newImage, std::vector<int>* rowsToFill, std::vector<int>* filledRows, int maxBlanks)
+{
+    for (int y = 0; y < newImage.height(); ++y)
+    {
+        auto it = std::find(filledRows->begin(),filledRows->end(), y);
+        if(it != filledRows->end()) continue; // skips row if it has already been filled
+        std::vector<int> blueValsInARow;
+        std::vector<int> redValsInARow;
+        for (int x = 0; x < newImage.width(); ++x)
+        {
+            auto blueVal = newImage.atXY(x,y,0,2);
+            auto redVal = newImage.atXY(x,y,0,0);
+            if (blueVal >= 254.5)
+            {
+                if(blueValsInARow.empty())
+                {
+                    if (x!=0) 
+                        blueValsInARow.emplace_back(x-1);
+                }
+                blueValsInARow.emplace_back(x);
+                redValsInARow.clear();
+            }
+            else
+            {
+                if(blueValsInARow.empty()) continue;
+                redValsInARow.emplace_back(x);
+                blueValsInARow.emplace_back(x);
+                if (blueValsInARow.size()-2 >= maxBlanks)
+                {
+                    blueValsInARow.clear();
+                    continue;
+                }
+                float firstBlueVal = newImage.atXY(blueValsInARow[0],y,0,2);
+                float lastBlueVal = newImage.atXY(blueValsInARow[blueValsInARow.size()-1],y,0,2);
+                float firstRedVal = newImage.atXY(blueValsInARow[0],y,0,0);
+                float lastRedVal = newImage.atXY(blueValsInARow[blueValsInARow.size()-1],y,0,0);
+                //check if it has reds on both sides
+                if(firstBlueVal < 254.5 && lastBlueVal < 254.5) //if neither ends are blue
+                {
+                    for (int i = 1; i < blueValsInARow.size()-1; ++i)
+                    {
+                        float colorVal = std::lerp(firstRedVal,lastRedVal, i/(blueValsInARow.size()-2));
+                        const float color[] = {colorVal ,0.f,0.f };
+                        newImage.draw_point((x-(blueValsInARow.size()-1))+i,y, 0, color);
+                    }
+                    
+                }
+                //check if it only has right red
+                else if (firstBlueVal >= 254.5) //if left is blue, then right is red
+                {
+                    const float color[] = { lastRedVal ,0.f,0.f };
+                    for (int i = 0; i <= x; ++i)
+                    {
+                        newImage.draw_point(i,y, 0, color);
+                    }
+                }
+                blueValsInARow.clear();
+            }
+            if(redValsInARow.size() == newImage.width())
+            {
+                auto it = std::find(filledRows->begin(),filledRows->end(), y);
+                if(it == filledRows->end()) // not found, then add
+                {
+                    filledRows->emplace_back(y);
+                    auto it = std::find(rowsToFill->begin(),rowsToFill->end(), y);
+                    if (it != rowsToFill->end())
+                    {
+                        rowsToFill->erase(it);
+                    }
+                }
+            }
+            if(blueValsInARow.size()-2 == maxBlanks) //check if it only has blue vals
+            {
+                auto it = std::find(rowsToFill->begin(),rowsToFill->end(), y);
+                if(it == rowsToFill->end()) // not found, then add
+                    rowsToFill->emplace_back(y);
+                //std::cout << "Blue row" << std::endl;
+            }
+            if (!blueValsInARow.empty() && x == newImage.width()-1 && blueValsInARow.size() != newImage.width())
+            {
+                float firstRedVal = newImage.atXY(blueValsInARow[0],y,0,0);
+                const float color[] = {firstRedVal ,0.f,0.f };
+                for (int i = 0; i <= blueValsInARow.size(); ++i)
+                {
+                    newImage.draw_point(x-i,y, 0, color);
+                }
+            }
+        }
+        //if (y == newImage.height()-1)
+        //{
+        //    blankRowsFilled = true;
+        //}
+    }
+    newImage.save_png("tempHeightHorz.png", 8);
+    
+    return vertConnect(newImage, rowsToFill);
+}
+
 inline void PointCloud::convertToImage()
 {
     std::vector<glm::vec3> points = {};
@@ -218,22 +355,7 @@ inline void PointCloud::convertToImage()
         if(vertex.position.y >= maxY)
             maxY=vertex.position.y;
     }
-    // Doesn't work for some reason
-    //for (auto vertex : vertices)
-    //{
-    //    //glm::vec3 newPos(vertex.position.x + abs(minX), vertex.position.y + abs(minY), (vertex.position.z + abs(minZ))*2);
-    //    //vertex.position = newPos;
-    //    vertex.position.x += abs(minX);
-    //    vertex.position.y += abs(minY);
-    //    vertex.position.z += abs(minZ);
-    //    vertex.position.z *= 2;
-    //}
-    //minZ+=abs(minZ);
-    //maxZ+=abs(minZ);
-    //minX+=abs(minX);
-    //maxX+=abs(minX);
-    //minY+=abs(minY);
-    //maxY+=abs(minY);
+    
     for (auto vertex : vertices)
     {
         //check to see if current Z-value already has a column, if not, create one
@@ -289,7 +411,7 @@ inline void PointCloud::convertToImage()
         }
         auto point_map_row = point_map[actual_map_index];
         int imgYPos = (abs(minZ) + actual_map_index)*2;
-        std::cout << "x points in row "<< actual_map_index << " " <<point_map_row.size() << std::endl;
+        std::cout << "x points in row "<< actual_map_index << " " << point_map_row.size() << std::endl;
         std::vector<float> xValsToAverage;
         float currentStep = xStep;
         for (int j = 0; j < size; j++)
@@ -324,86 +446,18 @@ inline void PointCloud::convertToImage()
     CImg<float>  newImage;
     newImage = image;
     std::vector<int> blankRows;
-    for (int y = 0; y < newImage.height(); ++y)
+    std::vector<int> filledRows;
+    int maxBlanks = 1;
+    while (filledRows.size() != newImage.height()-1 || maxBlanks > 10)
     {
-        std::vector<int> blueValsInARow;
-        for (int x = 0; x < newImage.width(); ++x)
-        {
-            auto blueVal = newImage.atXY(x,y,0,2);
-            auto redVal = newImage.atXY(x,y,0,0);
-            if (blueVal >= 254.5)
-            {
-                if(blueValsInARow.empty())
-                {
-                    if (x!=0) 
-                        blueValsInARow.emplace_back(x-1);
-                }
-                blueValsInARow.emplace_back(x);
-            }
-            else
-            {
-                if(blueValsInARow.empty()) continue;
-                blueValsInARow.emplace_back(x);
-                float firstBlueVal = newImage.atXY(blueValsInARow[0],y,0,2);
-                float lastBlueVal = newImage.atXY(blueValsInARow[blueValsInARow.size()-1],y,0,2);
-                float firstRedVal = newImage.atXY(blueValsInARow[0],y,0,0);
-                float lastRedVal = newImage.atXY(blueValsInARow[blueValsInARow.size()-1],y,0,0);
-                //check if it has reds on both sides
-                if(firstBlueVal < 254.5 && lastBlueVal < 254.5) //if neither ends are blue
-                {
-                    for (int i = 1; i < blueValsInARow.size()-1; ++i)
-                    {
-                        float colorVal = std::lerp(firstRedVal,lastRedVal, i/(blueValsInARow.size()-2));
-                        const float color[] = {colorVal ,0.f,0.f };
-                        newImage.draw_point((x-(blueValsInARow.size()-1))+i,y, 0, color);
-                    }
-                    
-                }
-                //check if it only has right red
-                else if (firstBlueVal >= 254.5) //if left is blue, then right is red
-                {
-                    const float color[] = { lastRedVal ,0.f,0.f };
-                    for (int i = 0; i <= x; ++i)
-                    {
-                        newImage.draw_point(i,y, 0, color);
-                    }
-                }
-                blueValsInARow.clear();
-            }
-            
-            if(blueValsInARow.size() == imgWidth) //check if it only has blue vals
-            {
-                //whole row todo Implement a way to go over these rows later. if statement works. Mark the rows.
-                blankRows.emplace_back(y);
-                //std::cout << "Blue row" << std::endl;
-            }
-            else if (!blueValsInARow.empty() && x == imgWidth-1)
-            {
-                float firstRedVal = newImage.atXY(blueValsInARow[0],y,0,0);
-                const float color[] = {firstRedVal ,0.f,0.f };
-                for (int i = 0; i <= blueValsInARow.size(); ++i)
-                {
-                    newImage.draw_point(x-i,y, 0, color);
-                }
-            }
-        }
+        newImage = horzConnect(newImage, &blankRows, &filledRows, maxBlanks);
+        //newImage = vertConnect(newImage, blankRows); //called through the horzConnect
+        std::string newFileName = " heightmap";
+        newFileName += std::to_string(maxBlanks);
+        newFileName += ".png";
+        newImage.save_png(newFileName.data(), 8);
+        maxBlanks++;
     }
-    newImage.save_png("heightmapFilledHor.png", 8);
-    for (int i = 0; i < blankRows.size(); ++i)
-    {
-        for (int x = 0; x < newImage.width(); ++x)
-        {
-            float upperColor = newImage.atXY(x,blankRows[i]-1,0,0);
-            float lowerColor = newImage.atXY(x,blankRows[i]+1,0,0);
-            
-            if(0>=upperColor && 0>=lowerColor) continue; // todo extract hor and vert filling, and add vert max dist filling.
-            
-            float colorVal = (upperColor + lowerColor)/2;
-            const float color[] = {colorVal, 0, 0};
-            newImage.draw_point(x,blankRows[i], 0, color);
-        }
-    }
-    newImage.save_png("heightmapFilledVert.png", 8);
     //InitializeMagick("");
     //Image heightMap(Geometry(lengthX*2,doubleSize*2), Color(0, 0, 0, 0));
     //emptyImage.modifyImage();

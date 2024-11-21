@@ -238,7 +238,7 @@ cimg_library::CImg<float> PointCloud::vertConnect(cimg_library::CImg<float> newI
                 //check if it has reds on both sides
                 if(firstBlueVal < 254.5 && lastBlueVal < 254.5) //if neither ends are blue, aka both are red
                 {
-                    if (blueValsInARow.size()-2 >= maxBlanks)
+                    if (blueValsInARow.size()-2 > maxBlanks)
                     {
                         blueValsInARow.clear();
                         continue;
@@ -253,7 +253,7 @@ cimg_library::CImg<float> PointCloud::vertConnect(cimg_library::CImg<float> newI
                 //check if it only bottom is red
                 else if (firstBlueVal >= 254.5) //if left is blue, then bottom is red
                 {
-                    if (blueValsInARow.size()-1 >= maxBlanks)
+                    if (blueValsInARow.size()-1 > maxBlanks)
                     {
                         blueValsInARow.clear();
                         continue;
@@ -290,39 +290,36 @@ cimg_library::CImg<float> PointCloud::horzConnect(cimg_library::CImg<float> newI
         if(it != filledRows->end()) continue; // skips row if it has already been filled
         std::vector<int> blueValsInARow;
         std::vector<int> redValsInARow;
+        std::vector<int> prevRedValsInARow;
         for (int x = 0; x < newImage.width(); ++x)
         {
             auto blueVal = newImage.atXY(x,y,0,2);
             //auto redVal = newImage.atXY(x,y,0,0);
-            if (blueVal >= 254.5)
+            if (blueVal >= 254)
             {
                 if(blueValsInARow.empty())
                 {
                     if (x!=0) 
                         blueValsInARow.emplace_back(x-1);
+                    prevRedValsInARow.clear();
+                    prevRedValsInARow = redValsInARow;
+                    redValsInARow.clear();
                 }
                 blueValsInARow.emplace_back(x);
-                redValsInARow.clear();
             }
             else
             {
                 redValsInARow.emplace_back(x);
-                if(redValsInARow.size() == newImage.width())
-                {
-                    auto it = std::find(filledRows->begin(),filledRows->end(), y);
-                    if(it == filledRows->end()) // not found, then add
-                        filledRows->emplace_back(y);
-                }
                 if(blueValsInARow.empty()) continue;
                 blueValsInARow.emplace_back(x);
-                float firstBlueVal = newImage.atXY(blueValsInARow[0],y,0,2);
-                float lastBlueVal = newImage.atXY(blueValsInARow[blueValsInARow.size()-1],y,0,2);
+                //float firstBlueVal = newImage.atXY(blueValsInARow[0],y,0,2);
+                //float lastBlueVal = newImage.atXY(blueValsInARow[blueValsInARow.size()-1],y,0,2);
                 float firstRedVal = newImage.atXY(blueValsInARow[0],y,0,0);
                 float lastRedVal = newImage.atXY(blueValsInARow[blueValsInARow.size()-1],y,0,0);
                 //check if it has reds on both sides
-                if(firstRedVal >= 0.05f && lastRedVal >= 0.05f) //if neither ends are blue
+                if(firstRedVal >= 0.05f && lastRedVal >= 0.05f) //if both ends are red
                 {
-                    if (blueValsInARow.size()-2 >= maxBlanks)
+                    if (blueValsInARow.size()-2 > maxBlanks)
                     {
                         blueValsInARow.clear();
                         continue;
@@ -331,22 +328,41 @@ cimg_library::CImg<float> PointCloud::horzConnect(cimg_library::CImg<float> newI
                     {
                         float colorVal = std::lerp(firstRedVal,lastRedVal, i/(blueValsInARow.size()-2));
                         const float color[] = {colorVal ,0.f,0.f };
-                        newImage.draw_point((x-(blueValsInARow.size()-1))+i,y, 0, color);
+                        int xPos = (x-(blueValsInARow.size()-1))+i;
+                        newImage.draw_point(xPos,y, 0, color);
+                        prevRedValsInARow.emplace_back(xPos);
                     }
                 }
                 else//check if it only has right red
                 {
-                    if (blueValsInARow.size()-1 >= maxBlanks)
+                    if (blueValsInARow.size()-1 > maxBlanks)
                     {
                         blueValsInARow.clear();
                         continue;
                     }
                     const float color[] = { lastRedVal ,0.f,0.f };
-                    for (int i = 0; i <= blueValsInARow.size(); ++i)
+                    for (int i = 0; i <= x; ++i)
                     {
-                        newImage.draw_point(blueValsInARow[i],y, 0, color);
+                        newImage.draw_point(i,y, 0, color);
+                        prevRedValsInARow.emplace_back(i);
                     }
                 }
+                for (int i = 0; i < redValsInARow.size(); ++i)
+                {
+                    int xPos = redValsInARow[i];
+                    //auto it = std::find(prevRedValsInARow.begin(),prevRedValsInARow.end(), xPos);
+                    //if(it != prevRedValsInARow.end()) 
+                        prevRedValsInARow.emplace_back(xPos);
+                }
+                redValsInARow = prevRedValsInARow;
+                if(redValsInARow.size() == newImage.width())
+                {
+                    auto it = std::find(filledRows->begin(),filledRows->end(), y);
+                    if(it == filledRows->end()) // not found, then add
+                        filledRows->emplace_back(y);
+                }
+                else if(redValsInARow.size() > newImage.width())
+                    std::cout << "Something SUS happend, TOO MANY IN A ROW " << redValsInARow.size();
                 blueValsInARow.clear();
             }
             if(x == newImage.width()) continue;
@@ -359,7 +375,9 @@ cimg_library::CImg<float> PointCloud::horzConnect(cimg_library::CImg<float> newI
                 for (int i = 0; i <= blueValsInARow.size(); ++i)
                 {
                     newImage.draw_point(x-i,y, 0, color);
+                    prevRedValsInARow.emplace_back(x-i);
                 }
+                redValsInARow = prevRedValsInARow;
             }
         }
     }
@@ -494,12 +512,6 @@ inline void PointCloud::convertToImage()
         newImage.save_png(newFileName.data(), 8);
         maxBlanks++;
     }
-    //InitializeMagick("");
-    //Image heightMap(Geometry(lengthX*2,doubleSize*2), Color(0, 0, 0, 0));
-    //emptyImage.modifyImage();
-    
-    
-    
     //std::vector<float> knot_vector = BSpline<glm::vec3>::get_knot_vector(size - 1);
     //auto surface = new BSplineSurface(2, 2, size - 1, size - 1, knot_vector, knot_vector, points, 0.5);
     //return surface;

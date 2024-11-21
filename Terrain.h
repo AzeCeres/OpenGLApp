@@ -11,6 +11,8 @@ public:
     //Terrain(const char* heightmap, int rezIn, int sizeDivisor, Shader* tessHeightMapShader);
     Terrain(unsigned char* data, int width, int height, int nrChannels, int rezIn, int sizeDivisorIn,
             ShaderT* tessHeightMapShaderIn);
+    Terrain(unsigned char* data, int width, int height, int nrChannels, int rezIn, int sizeDivisorXIn, int sizeDivisorYIn, int sizeDivisorZIn,
+            ShaderT* tessHeightMapShaderIn);
     void draw();
     void setShader(ShaderT *shaderIn);
     int rez;
@@ -24,7 +26,7 @@ public:
 private:
     int width;
     int height;
-    int sizeDivisor;
+    int sizeDivisorX,sizeDivisorY,sizeDivisorZ;
     ShaderT *tessHeightMapShader;
     unsigned int terrainVAO, terrainVBO;
     unsigned int heightmapTexture;

@@ -26,6 +26,7 @@ const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
 bool wireframe = false;
+bool isTerrain = false;
 
 // camera - give pretty starting point
 Camera camera(glm::vec3(1.0f, 3.0f, 20.5f),
@@ -83,17 +84,17 @@ int main()
     // configure global opengl state
     // -----------------------------|
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE); // todo disable?
     glDepthMask(GL_TRUE);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // todo disable?
+    glEnable(GL_BLEND); // todo disable?
     // build and compile our shader program
     // ------------------------------------
     //Shader tessHeightMapShader("shaders/midgpuheight.vs", "shaders/gpuheight.fs");
-    //ShaderT tessHeightMapShader("shaders/gpuheight.vs", "shaders/gpuheight.fs",
-    //    "shaders/gpuheight.tcs", "shaders/gpuheight.tes");
+    ShaderT tessHeightMapShader("shaders/gpuheight.vs", "shaders/gpuheight.fs",
+        "shaders/gpuheight.tcs", "shaders/gpuheight.tes");
     ShaderVF noLightShader("shaders/default.vs", "shaders/noLight.fs");
-    //int width, height, nrChannels;
+    
     //unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0); // rez 15-20, sizediv 1
     //unsigned char *data = stbi_load("heightmaps/hqheightmap.png", &width, &height, &nrChannels, 0); // rez 20-25, sizediv 2
     //unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0); // rez 20-25, sizediv 4
@@ -103,6 +104,9 @@ int main()
     pointCloud->set_shader(&noLightShader);
     pointCloud->hasData();
     pointCloud->setup();
+    int width, height, nrChannels;
+    unsigned char *data = stbi_load("heightmaps/FinalHeightmap.png", &width, &height, &nrChannels, 0); 
+    Terrain terrain(data, width, height, nrChannels, 20, 2,1,1, &tessHeightMapShader); // rez 15-20, sizediv 1
 
     // render loop
     // -----------
@@ -125,43 +129,66 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // be sure to activate shader when setting uniforms/drawing objects
-        noLightShader.use();
-        //tessHeightMapShader.use();
-
+        if (isTerrain)
+        {
+            tessHeightMapShader.use();
+        }
+        else
+        {
+            noLightShader.use(); 
+        }
     	//glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
 
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100000.0f);
         glm::mat4 view = camera.GetViewMatrix();
-        //tessHeightMapShader.setMat4("projection", projection);
-        //tessHeightMapShader.setMat4("view", view);
-        noLightShader.setMat4("projection", projection);
-        noLightShader.setMat4("view", view);
-
+        
+        if (isTerrain)
+        {
+            tessHeightMapShader.setMat4("projection", projection);
+            tessHeightMapShader.setMat4("view", view);
+        }
+        else
+        {
+            noLightShader.setMat4("projection", projection);
+            noLightShader.setMat4("view", view);
+        }
         // world transformation
         glm::mat4 model = glm::mat4(1.0f);
-        //tessHeightMapShader.setMat4("model", model);
-        noLightShader.setMat4("model", model);
+        if (isTerrain)
+        {
+            tessHeightMapShader.setMat4("model", model);
+        }
+        else
+        {
+            noLightShader.setMat4("model", model);
+        }
         
         // render the terrain
-        //if (wireframe)
-        //{
-        //    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        //}
-        //else
-        //{
-        //    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        //}
-        pointCloud->draw();
+        if (wireframe)
+        {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }
+        else
+        {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
 
-        //terrain.draw();
-        //float terrainHeight =terrain.getHeightAtPoint(camera.Position.x,camera.Position.z);
-        //if(camera.Position.y < terrainHeight+1)
-        //{
-        //    std::cout << "Camera below terrain!" << std::endl;
-        //    camera.Position.y = terrainHeight+1;
-        //}
-        //std::cout << "Height at (" << camera.Position.x << " " << camera.Position.z << "):" << terrain.getHeightAtPoint(camera.Position.x,camera.Position.z) << std::endl;
+        if (isTerrain)
+        {
+            terrain.draw();
+            float terrainHeight =terrain.getHeightAtPoint(camera.Position.x,camera.Position.z);
+            if(camera.Position.y < terrainHeight+1)
+            {
+                std::cout << "Camera below terrain!" << std::endl;
+                camera.Position.y = terrainHeight+1;
+            }
+            std::cout << "Height at (" << camera.Position.x << " " << camera.Position.z << "):" << terrain.getHeightAtPoint(camera.Position.x,camera.Position.z) << std::endl;
+        }
+        else
+        {
+            pointCloud->draw();
+        }
         
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -171,8 +198,8 @@ int main()
 
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------
-    //terrain.clear();
-    //stbi_image_free(data);
+    terrain.clear();
+    stbi_image_free(data);
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
@@ -216,6 +243,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         {
         case GLFW_KEY_F:
             wireframe = !wireframe;
+            break;
+        case GLFW_KEY_T:
+            isTerrain = !isTerrain;
             break;
         }
     }

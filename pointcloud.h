@@ -245,9 +245,9 @@ cimg_library::CImg<float> PointCloud::vertConnect(cimg_library::CImg<float> newI
                     }
                     for (int i = 1; i < blueValsInARow.size()-1; ++i)
                     {
-                        float colorVal = std::lerp(firstRedVal,lastRedVal, i/(blueValsInARow.size()-2));
+                        float colorVal = std::lerp(firstRedVal,lastRedVal, (float)(i)/(float)(blueValsInARow.size()-1));;
                         const float color[] = {colorVal ,0.f,0.f };
-                        newImage.draw_point(x,(y-(blueValsInARow.size()-1))+i, 0, color);
+                        newImage.draw_point(x,blueValsInARow[i], 0, color);
                     }
                 }
                 //check if it only bottom is red
@@ -310,6 +310,12 @@ cimg_library::CImg<float> PointCloud::horzConnect(cimg_library::CImg<float> newI
             else
             {
                 redValsInARow.emplace_back(x);
+                if(redValsInARow.size() == newImage.width())
+                {
+                    auto it = std::find(filledRows->begin(),filledRows->end(), y);
+                    if(it == filledRows->end()) // not found, then add
+                        filledRows->emplace_back(y);
+                }
                 if(blueValsInARow.empty()) continue;
                 blueValsInARow.emplace_back(x);
                 //float firstBlueVal = newImage.atXY(blueValsInARow[0],y,0,2);
@@ -326,11 +332,12 @@ cimg_library::CImg<float> PointCloud::horzConnect(cimg_library::CImg<float> newI
                     }
                     for (int i = 1; i < blueValsInARow.size()-1; ++i)
                     {
-                        float colorVal = std::lerp(firstRedVal,lastRedVal, i/(blueValsInARow.size()-2));
-                        const float color[] = {colorVal ,0.f,0.f };
-                        int xPos = (x-(blueValsInARow.size()-1))+i;
+                        float colorVal = std::lerp(firstRedVal,lastRedVal, (float)(i)/(float)(blueValsInARow.size()-1));
+                        const float color[] = {colorVal ,0.f , 0.f};
+                        int xPos = //(x-(blueValsInARow.size()-1))+i;
+                            blueValsInARow[i];
                         newImage.draw_point(xPos,y, 0, color);
-                        prevRedValsInARow.emplace_back(xPos);
+                        //prevRedValsInARow.emplace_back(xPos);
                     }
                 }
                 else//check if it only has right red
@@ -344,45 +351,38 @@ cimg_library::CImg<float> PointCloud::horzConnect(cimg_library::CImg<float> newI
                     for (int i = 0; i <= x; ++i)
                     {
                         newImage.draw_point(i,y, 0, color);
-                        prevRedValsInARow.emplace_back(i);
+                        //prevRedValsInARow.emplace_back(i);
                     }
                 }
-                for (int i = 0; i < redValsInARow.size(); ++i)
-                {
-                    int xPos = redValsInARow[i];
-                    //auto it = std::find(prevRedValsInARow.begin(),prevRedValsInARow.end(), xPos);
-                    //if(it != prevRedValsInARow.end()) 
-                        prevRedValsInARow.emplace_back(xPos);
-                }
-                redValsInARow = prevRedValsInARow;
-                if(redValsInARow.size() == newImage.width())
-                {
-                    auto it = std::find(filledRows->begin(),filledRows->end(), y);
-                    if(it == filledRows->end()) // not found, then add
-                        filledRows->emplace_back(y);
-                }
-                else if(redValsInARow.size() > newImage.width())
-                    std::cout << "Something SUS happend, TOO MANY IN A ROW " << redValsInARow.size();
+                //for (int i = 0; i < redValsInARow.size(); ++i)
+                //{
+                //    int xPos = redValsInARow[i];
+                //    //auto it = std::find(prevRedValsInARow.begin(),prevRedValsInARow.end(), xPos);
+                //    //if(it != prevRedValsInARow.end()) 
+                //        prevRedValsInARow.emplace_back(xPos);
+                //}
+                //redValsInARow = prevRedValsInARow;
+                
+                //else if(redValsInARow.size() > newImage.width())
+                // std::cout << "Something SUS happend, TOO MANY IN A ROW " << redValsInARow.size();
                 blueValsInARow.clear();
             }
-            if(x == newImage.width()) continue;
-            //std::cout << maxBlanks << " " << redValsInARow.size() << " " << newImage.width() << std::endl;
+            if(x != newImage.width()-1) continue;
+            if(blueValsInARow.empty()) continue;
             if(blueValsInARow.size()-1 > maxBlanks) continue;
-            if (!blueValsInARow.empty() && blueValsInARow.size() != newImage.width())
+            //if(blueValsInARow.size() == newImage.width()) continue;
+            
+            float firstRedVal = newImage.atXY(blueValsInARow[0],y,0,0);
+            const float color[] = {firstRedVal ,0.f,0.f };
+            for (int i = 0; i <= blueValsInARow.size(); ++i)
             {
-                float firstRedVal = newImage.atXY(blueValsInARow[0],y,0,0);
-                const float color[] = {firstRedVal ,0.f,0.f };
-                for (int i = 0; i <= blueValsInARow.size(); ++i)
-                {
-                    newImage.draw_point(x-i,y, 0, color);
-                    prevRedValsInARow.emplace_back(x-i);
-                }
-                redValsInARow = prevRedValsInARow;
+                newImage.draw_point(x-i,y, 0, color);
+                prevRedValsInARow.emplace_back(x-i);
             }
+            //redValsInARow = prevRedValsInARow;
         }
     }
     newImage.save_png("tempHeightHorz.png", 8);
-    
     return vertConnect(newImage, filledCollumns, maxBlanks);
 }
 
@@ -436,10 +436,11 @@ inline void PointCloud::convertToImage()
     
     float differenceZ = abs(lengthZ-doubleSize);
     float difPercentY = scalarDiff(maxY+abs(minY),255.f); // minY should be 0, maxY should be 255
+    float difPercentX = (scalarDiff(lengthZ, doubleSize) + 1);
     std::cout<< "length Z = " << lengthZ << " amount of rows = " << doubleSize << " Difference = " << differenceZ << " length X = " << lengthX << std::endl;
     std::cout<< "maxY = " << maxY << " minY = " << minY << " difY = " << difPercentY << " maxY + minY = " << (maxY+abs(minY))*difPercentY << std::endl;
     
-    const int imgWidth = lengthX * (scalarDiff(lengthZ, doubleSize) + 1)*2;
+    const int imgWidth = lengthX * difPercentX *2;
     std::cout << "width: "<< imgWidth << std::endl;
     const int imgHeight = lengthZ * 2;
     float xStep = (float)lengthX/(float)imgWidth;
@@ -465,36 +466,35 @@ inline void PointCloud::convertToImage()
         auto point_map_row = point_map[actual_map_index];
         int imgYPos = (abs(minZ) + actual_map_index)*2;
         std::cout << "x points in row "<< actual_map_index << " " << point_map_row.size() << std::endl;
-        std::vector<float> xValsToAverage;
+        std::vector<float> heightsToAverage;
+        std::vector<float> xVals;
         float currentStep = xStep;
         for (int j = 0; j < size; j++)
         {
             auto curIndex = static_cast<int>(point_map_row.size() * (static_cast<float>(j) / size));
-            float xToImgVal =point_map_row[curIndex].x + abs(minX);
+            float xToImgVal = point_map_row[curIndex].x + abs(minX);
             if (xToImgVal > currentStep)
             {
-                float averageHeight = getAverage(xValsToAverage);
+                float averageHeight = getAverage(heightsToAverage);
                 const float color[]{(abs(minY)+averageHeight)*difPercentY, 0,0};
-                currentStep += xStep;
+                image.draw_point((int)(currentStep/xStep)-1,imgYPos, 0, color);
+                heightsToAverage.clear();
+                xVals.clear();
                 while(xToImgVal >=  currentStep)
                     currentStep += xStep;
-                image.draw_point((int)(currentStep/xStep)-1,imgYPos, 0, color);
-                xValsToAverage.clear();
+                
             }
             if (xToImgVal <= currentStep)
             {
-                xValsToAverage.emplace_back(point_map_row[curIndex].y);
+                heightsToAverage.emplace_back(point_map_row[curIndex].y);
+                xVals.emplace_back(point_map_row[curIndex].x);
             }
             //image.draw_point(j, (int)(actual_map_index+minZ)*2, );
             points.push_back(point_map_row[curIndex]);
         }
     }
     
-    
-    
-    
-    
-    image.save_png("heightmapRaw.png", 8);
+    image.save_png("heightmapRaw.png", 4);
     CImgDisplay local(image, "heightmap");
     CImg<float>  newImage;
     newImage = image;
@@ -502,16 +502,36 @@ inline void PointCloud::convertToImage()
     std::vector<int> filledRows;
     std::vector<int> filledColumns;
     int maxBlanks = 1;
-    while (filledRows.size() != newImage.height() | filledColumns.size() != newImage.width())
+    while (filledRows.size() != newImage.height() && filledColumns.size() != newImage.width())
     {
         newImage = horzConnect(newImage, &blankRows, &filledRows, &filledColumns, maxBlanks);
         //newImage = vertConnect(newImage, blankRows); //called through the horzConnect
-        std::string newFileName = " heightmap";
+        std::string newFileName = "heightmap";
         newFileName += std::to_string(maxBlanks);
         newFileName += ".png";
-        newImage.save_png(newFileName.data(), 8);
-        maxBlanks++;
+        newImage.save_png(newFileName.data(), 4);
+        std::cout << "Finished Iteration " << maxBlanks << std::endl;
+        std::cout << "  Current Rows Filled = " << filledRows.size() << std::endl;
+        std::cout << "  Current Cols Filled = " << filledColumns.size() << std::endl;
+        maxBlanks += maxBlanks/4 + 1;
     }
+    CImg<float>  blurPhoto;
+    blurPhoto = newImage;
+    blurPhoto.blur(1);
+    blurPhoto.save_png("heightmaps/FinalHeightmap.png", 4);
+
+    using namespace std;
+    ofstream outputFile("heightmaps/HeightmapInfo.txt");
+    if (!outputFile.is_open()) {
+        cerr << "Error opening the output file!" << "\n";
+        return;
+    }
+    outputFile << blurPhoto.height() << endl;
+    outputFile << blurPhoto.width() << endl;
+    outputFile << difPercentX << endl;
+    outputFile << difPercentY << endl;
+    
+    
     //std::vector<float> knot_vector = BSpline<glm::vec3>::get_knot_vector(size - 1);
     //auto surface = new BSplineSurface(2, 2, size - 1, size - 1, knot_vector, knot_vector, points, 0.5);
     //return surface;

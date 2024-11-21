@@ -10,12 +10,16 @@
 
 Terrain::Terrain(unsigned char *data,  int width, int height, int nrChannels, int rezIn, int sizeDivisorIn, ShaderT* tessHeightMapShaderIn)
 {
+    Terrain(data, width, height, nrChannels, rezIn, sizeDivisorIn, sizeDivisorIn, sizeDivisorIn, tessHeightMapShaderIn);
+}
+
+Terrain::Terrain(unsigned char* data, int width, int height, int nrChannels, int rezIn, int sizeDivisorXIn,
+    int sizeDivisorYIn, int sizeDivisorZIn, ShaderT* tessHeightMapShaderIn)
+{
     GLint maxTessLevel;
     glGetIntegerv(GL_MAX_TESS_GEN_LEVEL, &maxTessLevel);
     std::cout << "Max available tess level: " << maxTessLevel << std::endl;
 
-    //Terrain terrain("heightmaps/hqheightmap.png", 40, 2, &tessHeightMapShader);
-    //Terrain terrain("heightmaps/uhqheightmap.png", 40, 4, &tessHeightMapShader);
     // load and create a texture
     // -------------------------    
     glGenTextures(1, &heightmapTexture);
@@ -28,35 +32,34 @@ Terrain::Terrain(unsigned char *data,  int width, int height, int nrChannels, in
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     // load image, create texture and generate mipmaps
-    //int width, height, nrChannels;
-    //heightmap - res- 1920 x 938 - verts - 1'800'960
-    //unsigned char *data = stbi_load("heightmaps/heightmap.png", &width, &height, &nrChannels, 0);
-    //hqheightmap - res - 3840 x 1876 - verts - 7'203'840
-    //unsigned char *data = stbi_load("heightmaps/hqheightmap.png", &width, &height, &nrChannels, 0);
-    // uhqheightmap - res - 7680 - 4320 - verts - 33,177,600 // The area is also stretched out further, rather than just being a higher resolution
-    // this can lead one to perceive the terrain is lower quality than it actually is
-    //unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0);
-    //unsigned char *data = stbi_load(heightmap, &width, &height, &nrChannels, 0);
-    
-    if (data)
-    {
-        this->height = height;
-        this->width = width;
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        tessHeightMapShader = tessHeightMapShaderIn;
-        tessHeightMapShader->setInt("heightMap", 0);
-        std::cout << "Loaded heightmap of size " << height << " x " << width << std::endl;
-    }
-    else
+
+    if(!data)
     {
         std::cout << "Failed to load texture" << std::endl;
+        return;
     }
+    this->height = height;
+    this->width = width;
+    if (nrChannels == 3)
+    {
+        
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    }
+    else if(nrChannels == 4)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    }
+    glGenerateMipmap(GL_TEXTURE_2D);
+    tessHeightMapShader = tessHeightMapShaderIn;
+    tessHeightMapShader->setInt("heightMap", 0);
+    std::cout << "Loaded heightmap of size " << height << " x " << width << std::endl;
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
     std::vector<float> vertices;
     rez = rezIn;
-    sizeDivisor = sizeDivisorIn;
+    sizeDivisorX = sizeDivisorXIn;
+    sizeDivisorY = sizeDivisorYIn;
+    sizeDivisorZ = sizeDivisorZIn;
     //(e.g. 20,40,60)(higher is recommended for larger heightmaps): ";
     if(rez < 1)
         rez = 1;
@@ -64,8 +67,8 @@ Terrain::Terrain(unsigned char *data,  int width, int height, int nrChannels, in
         rez = 120;
     //unsigned sizeDivisor = 1;
     //the size divisor of the terrain (e.g. 1,2,4)(to normalize the size of the maps): ";
-    height = height / sizeDivisor;
-    width = width / sizeDivisor;
+    height = height / sizeDivisorZ;
+    width = width / sizeDivisorX;
     
     for(unsigned i = 0; i <= rez-1; i++)
     {
@@ -164,11 +167,11 @@ float Terrain::getHeightAtPixel(float x, float z) {
 
 float Terrain::getHeightAtPoint(float x, float z)
 {
-    const auto sizeDiv = static_cast<float>(sizeDivisor);
+    //const auto sizeDiv = static_cast<float>(sizeDivisor);
     const auto heightF = static_cast<float>(height);
     const auto widthF  = static_cast<float>(width);
-    x *= sizeDiv;
-    z *= sizeDiv;
+    x *= sizeDivisorX;
+    z *= sizeDivisorZ;
     x += (widthF  / 2.0f);
     z += (heightF / 2.0f);
     std::cout << x << " " << z <<"\n";

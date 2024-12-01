@@ -8,107 +8,21 @@
 //}
 
 
-Terrain::Terrain(unsigned char *data,  int width, int height, int nrChannels, int rezIn, int sizeDivisorIn, ShaderT* tessHeightMapShaderIn)
+Terrain::Terrain(unsigned char* data, int width, int height, int nrChannels, int rezIn, float sizeDivisorIn,
+                 ShaderT* tessHeightMapShaderIn)
 {
     Terrain(data, width, height, nrChannels, rezIn, sizeDivisorIn, sizeDivisorIn, sizeDivisorIn, tessHeightMapShaderIn);
 }
 
-Terrain::Terrain(unsigned char* data, int width, int height, int nrChannels, int rezIn, int sizeDivisorXIn,
-    int sizeDivisorYIn, int sizeDivisorZIn, ShaderT* tessHeightMapShaderIn)
+void Terrain::bind()
 {
-    GLint maxTessLevel;
-    glGetIntegerv(GL_MAX_TESS_GEN_LEVEL, &maxTessLevel);
-    std::cout << "Max available tess level: " << maxTessLevel << std::endl;
-
-    // load and create a texture
-    // -------------------------    
-    glGenTextures(1, &heightmapTexture);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, heightmapTexture); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
-    // set the texture wrapping parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // set texture filtering parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // load image, create texture and generate mipmaps
-
-    if(!data)
-    {
-        std::cout << "Failed to load texture" << std::endl;
-        return;
-    }
-    this->height = height;
-    this->width = width;
-    if (nrChannels == 3)
-    {
-        
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-    }
-    else if(nrChannels == 4)
-    {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    }
-    glGenerateMipmap(GL_TEXTURE_2D);
-    tessHeightMapShader = tessHeightMapShaderIn;
-    tessHeightMapShader->setInt("heightMap", 0);
-    std::cout << "Loaded heightmap of size " << height << " x " << width << std::endl;
-    // set up vertex data (and buffer(s)) and configure vertex attributes
-    // ------------------------------------------------------------------
-    std::vector<float> vertices;
-    rez = rezIn;
-    sizeDivisorX = sizeDivisorXIn;
-    sizeDivisorY = sizeDivisorYIn;
-    sizeDivisorZ = sizeDivisorZIn;
-    //(e.g. 20,40,60)(higher is recommended for larger heightmaps): ";
-    if(rez < 1)
-        rez = 1;
-    else if (rez > 120)
-        rez = 120;
-    //unsigned sizeDivisor = 1;
-    //the size divisor of the terrain (e.g. 1,2,4)(to normalize the size of the maps): ";
-    height = height / sizeDivisorZ;
-    width = width / sizeDivisorX;
-    
-    for(unsigned i = 0; i <= rez-1; i++)
-    {
-        for(unsigned j = 0; j <= rez-1; j++)
-        {
-            vertices.push_back(-width/2.0f + width*i/(float)rez); // v.x
-            vertices.push_back(0.0f); // v.y
-            vertices.push_back(-height/2.0f + height*j/(float)rez); // v.z
-            vertices.push_back(i / (float)rez); // u
-            vertices.push_back(j / (float)rez); // v
-
-            vertices.push_back(-width/2.0f + width*(i+1)/(float)rez); // v.x
-            vertices.push_back(0.0f); // v.y
-            vertices.push_back(-height/2.0f + height*j/(float)rez); // v.z
-            vertices.push_back((i+1) / (float)rez); // u
-            vertices.push_back(j / (float)rez); // v
-
-            vertices.push_back(-width/2.0f + width*i/(float)rez); // v.x
-            vertices.push_back(0.0f); // v.y
-            vertices.push_back(-height/2.0f + height*(j+1)/(float)rez); // v.z
-            vertices.push_back(i / (float)rez); // u
-            vertices.push_back((j+1) / (float)rez); // v
-
-            vertices.push_back(-width/2.0f + width*(i+1)/(float)rez); // v.x
-            vertices.push_back(0.0f); // v.y
-            vertices.push_back(-height/2.0f + height*(j+1)/(float)rez); // v.z
-            vertices.push_back((i+1) / (float)rez); // u
-            vertices.push_back((j+1) / (float)rez); // v
-        }
-    }
-    std::cout << "Loaded " << rez*rez << " patches of 4 control points each" << std::endl;
-    std::cout << "Processing " << rez*rez*4 << " vertices in vertex shader" << std::endl;
-
     // first, configure the cube's VAO (and terrainVBO)
-    
+
     glGenVertexArrays(1, &terrainVAO);
     glBindVertexArray(terrainVAO);
 
     glGenBuffers(1, &terrainVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, terrainVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, terrainVBO); // todo the code part that makes it so the pointcloud won't render
     glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertices.size(), &vertices[0], GL_STATIC_DRAW);
 
     // position attribute
@@ -119,6 +33,99 @@ Terrain::Terrain(unsigned char* data, int width, int height, int nrChannels, int
     glEnableVertexAttribArray(1);
 
     glPatchParameteri(GL_PATCH_VERTICES, NUM_PATCH_PTS);
+    glBindVertexArray(0);
+}
+
+Terrain::Terrain(unsigned char* data, int width, int height, int nrChannels, int rezIn, float sizeDivisorXIn,
+                 float sizeDivisorYIn, float sizeDivisorZIn, ShaderT* tessHeightMapShaderIn)
+{
+    GLint maxTessLevel;
+    glGetIntegerv(GL_MAX_TESS_GEN_LEVEL, &maxTessLevel);
+    std::cout << "Max available tess level: " << maxTessLevel << std::endl;
+
+    // load and create a texture
+    // -------------------------    
+    glGenTextures(1, &heightmapTexture);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, heightmapTexture);
+    // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
+    // set the texture wrapping parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    // set texture wrapping to GL_REPEAT (default wrapping method)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // set texture filtering parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // load image, create texture and generate mipmaps
+
+    if (!data)
+    {
+        std::cout << "Failed to load texture" << std::endl;
+        return;
+    }
+    this->height = height;
+    this->width = width;
+    if (nrChannels == 3)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    }
+    else if (nrChannels == 4)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    }
+    glGenerateMipmap(GL_TEXTURE_2D);
+    tessHeightMapShader = tessHeightMapShaderIn;
+    tessHeightMapShader->setInt("heightMap", 0);
+    std::cout << "Loaded heightmap of size " << height << " x " << width << std::endl;
+    // set up vertex data (and buffer(s)) and configure vertex attributes
+    // ------------------------------------------------------------------
+    rez = rezIn;
+    sizeDivisorX = sizeDivisorXIn;
+    sizeDivisorY = sizeDivisorYIn;
+    sizeDivisorZ = sizeDivisorZIn;
+    //(e.g. 20,40,60)(higher is recommended for larger heightmaps): ";
+    if (rez < 1)
+        rez = 1;
+    else if (rez > 120)
+        rez = 120;
+    //unsigned sizeDivisor = 1;
+    //the size divisor of the terrain (e.g. 1,2,4)(to normalize the size of the maps): ";
+    height = height / sizeDivisorZ;
+    width = width / sizeDivisorX;
+
+    for (unsigned i = 0; i <= rez - 1; i++)
+    {
+        for (unsigned j = 0; j <= rez - 1; j++)
+        {
+            vertices.push_back(-width / 2.0f + width * i / (float)rez); // v.x
+            vertices.push_back(0.0f); // v.y
+            vertices.push_back(-height / 2.0f + height * j / (float)rez); // v.z
+            vertices.push_back(i / (float)rez); // u
+            vertices.push_back(j / (float)rez); // v
+
+            vertices.push_back(-width / 2.0f + width * (i + 1) / (float)rez); // v.x
+            vertices.push_back(0.0f); // v.y
+            vertices.push_back(-height / 2.0f + height * j / (float)rez); // v.z
+            vertices.push_back((i + 1) / (float)rez); // u
+            vertices.push_back(j / (float)rez); // v
+
+            vertices.push_back(-width / 2.0f + width * i / (float)rez); // v.x
+            vertices.push_back(0.0f); // v.y
+            vertices.push_back(-height / 2.0f + height * (j + 1) / (float)rez); // v.z
+            vertices.push_back(i / (float)rez); // u
+            vertices.push_back((j + 1) / (float)rez); // v
+
+            vertices.push_back(-width / 2.0f + width * (i + 1) / (float)rez); // v.x
+            vertices.push_back(0.0f); // v.y
+            vertices.push_back(-height / 2.0f + height * (j + 1) / (float)rez); // v.z
+            vertices.push_back((i + 1) / (float)rez); // u
+            vertices.push_back((j + 1) / (float)rez); // v
+        }
+    }
+    std::cout << "Loaded " << rez * rez << " patches of 4 control points each" << std::endl;
+    std::cout << "Processing " << rez * rez * 4 << " vertices in vertex shader" << std::endl;
+
+    bind();
 }
 
 void Terrain::draw()
@@ -126,10 +133,11 @@ void Terrain::draw()
     //tessHeightMapShader->setInt("heightMap", 0);
     tessHeightMapShader->use();
     glBindVertexArray(terrainVAO);
-    glDrawArrays(GL_PATCHES, 0, NUM_PATCH_PTS*rez*rez);
+    glDrawArrays(GL_PATCHES, 0, NUM_PATCH_PTS * rez * rez);
+    glBindVertexArray(0);
 }
 
-void Terrain::setShader(ShaderT *shaderIn)
+void Terrain::setShader(ShaderT* shaderIn)
 {
     tessHeightMapShader = shaderIn;
 }
@@ -145,9 +153,10 @@ void Terrain::clear()
     glDeleteVertexArrays(1, &terrainVAO);
     glDeleteBuffers(1, &terrainVBO);
 }
+
 // Function to get the height at a specified point in the heightmap using texture sampling
-float Terrain::getHeightAtPixel(float x, float z) {
-    
+float Terrain::getHeightAtPixel(float x, float z)
+{
     // Convert texture coordinates to pixel coordinates
     int pixelX = x;
     int pixelY = z;
@@ -161,7 +170,7 @@ float Terrain::getHeightAtPixel(float x, float z) {
 
     // Retrieve the height value at the specified point
     float heightValue = texelData[index];
-    heightValue *= 64.0 - 16.0; // Scale the height value to the desired range, same as within the shader
+    heightValue *= 64.0/sizeDivisorY - 16.0; // Scale the height value to the desired range, same as within the shader
     return heightValue;
 }
 
@@ -169,18 +178,19 @@ float Terrain::getHeightAtPoint(float x, float z)
 {
     //const auto sizeDiv = static_cast<float>(sizeDivisor);
     const auto heightF = static_cast<float>(height);
-    const auto widthF  = static_cast<float>(width);
+    const auto widthF = static_cast<float>(width);
     x *= sizeDivisorX;
     z *= sizeDivisorZ;
-    x += (widthF  / 2.0f);
+    x += (widthF / 2.0f);
     z += (heightF / 2.0f);
-    std::cout << x << " " << z <<"\n";
-    return getHeightAtPixel(x,z);
+    std::cout << x << " " << z << "\n";
+    return getHeightAtPixel(x, z);
     //return interpolateHeightAtPoint(x,z);
 }
 
 // Function to interpolate the height at a specified point using barycentric coordinates
-float Terrain::interpolateHeightAtPoint(float x, float z) {
+float Terrain::interpolateHeightAtPoint(float x, float z)
+{
     // Convert texture coordinates to pixel coordinates
     int pixelX = x;
     int pixelZ = z;
@@ -195,7 +205,7 @@ float Terrain::interpolateHeightAtPoint(float x, float z) {
     glm::ivec2 pixel3(pixelX, pixelZ + 1);
 
     // Calculate the barycentric coordinates of the point within the triangle
-    glm::vec2 point(x,z);
+    glm::vec2 point(x, z);
     glm::vec3 barycentric = calculateBarycentricCoordinates(point, pixel1, pixel2, pixel3);
 
     // Retrieve the heights of the three pixels
@@ -210,7 +220,9 @@ float Terrain::interpolateHeightAtPoint(float x, float z) {
 }
 
 // Function to calculate barycentric coordinates of a point within a triangle
-glm::vec3 Terrain::calculateBarycentricCoordinates(const glm::vec2& point, const glm::ivec2& p1, const glm::ivec2& p2, const glm::ivec2& p3) {
+glm::vec3 Terrain::calculateBarycentricCoordinates(const glm::vec2& point, const glm::ivec2& p1, const glm::ivec2& p2,
+                                                   const glm::ivec2& p3)
+{
     // Precompute vectors
     glm::vec2 v0 = p3 - p1;
     glm::vec2 v1 = p2 - p1;
@@ -242,13 +254,12 @@ glm::vec3 Terrain::calculateBarycentricCoordinates(const glm::vec2& point, const
 void Terrain::setupTexelData()
 {
     if (!texelData.empty()) return;
-    
+
     // Activate the texture unit and bind the heightmap texture
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, heightmapTexture);
 
     // Sample the texture at the calculated coordinates
-    texelData = std::vector<float> (width * height); // Assuming single-channel texture format (GL_RED)
+    texelData = std::vector<float>(width * height); // Assuming single-channel texture format (GL_RED)
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, texelData.data()); //GL_RGBA
 }
-

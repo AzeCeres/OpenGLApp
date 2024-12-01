@@ -9,9 +9,10 @@ public:
     const unsigned int NUM_PATCH_PTS = 4;
     Terrain();
     //Terrain(const char* heightmap, int rezIn, int sizeDivisor, Shader* tessHeightMapShader);
-    Terrain(unsigned char* data, int width, int height, int nrChannels, int rezIn, int sizeDivisorIn,
+    Terrain(unsigned char* data, int width, int height, int nrChannels, int rezIn, float sizeDivisorIn,
             ShaderT* tessHeightMapShaderIn);
-    Terrain(unsigned char* data, int width, int height, int nrChannels, int rezIn, int sizeDivisorXIn, int sizeDivisorYIn, int sizeDivisorZIn,
+    void bind();
+    Terrain(unsigned char* data, int width, int height, int nrChannels, int rezIn, float sizeDivisorXIn, float sizeDivisorYIn, float sizeDivisorZIn,
             ShaderT* tessHeightMapShaderIn);
     void draw();
     void setShader(ShaderT *shaderIn);
@@ -22,11 +23,12 @@ public:
     float getHeightAtPoint(float x, float z);
     float interpolateHeightAtPoint(float x, float z);
     glm::vec3 calculateBarycentricCoordinates(const glm::vec2& point, const glm::ivec2& p1, const glm::ivec2& p2, const glm::ivec2& p3);
-
+    float sizeDivisorX,sizeDivisorY,sizeDivisorZ;
 private:
+    std::vector<float> vertices;
     int width;
     int height;
-    int sizeDivisorX,sizeDivisorY,sizeDivisorZ;
+    
     ShaderT *tessHeightMapShader;
     unsigned int terrainVAO, terrainVBO;
     unsigned int heightmapTexture;

@@ -62,7 +62,7 @@ private:
     cimg_library::CImg<float> vertConnect(cimg_library::CImg<float> newImage, std::vector<int>* filledColumns, int maxBlanks);
     cimg_library::CImg<float> horzConnect(cimg_library::CImg<float> newImage, std::vector<int>* rowsToFill,
                                           std::vector<int>* filledRows, std::vector<int>* filledCollumns, int maxBlanks);
-    void convertToImage();
+    void convertToImage(std::string imagePath);
     void pre_render() const
     {
         shader->use();
@@ -122,9 +122,8 @@ private:
     }
 
 public:
-    void setup()
+    void bind()
     {
-        convertToImage();
         glGenVertexArrays(1, &VAO);
         glGenBuffers(1, &VBO);
         glGenBuffers(1, &EBO);
@@ -144,6 +143,15 @@ public:
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, texCoords));
 
         glBindVertexArray(0);
+    }
+
+    void setup(std::string imagePath)
+    {
+        using namespace cimg_library;
+        CImg<float> image;
+        try { image.load(imagePath.c_str()); } catch (CImgIOException) { convertToImage(imagePath); }  //Rudimentary check to see if there is an image, not necessarily one for the correct las file.
+        //convertToImage(imagePath);
+        bind();
     }
     PointCloud(std::string file)
     {
@@ -386,7 +394,7 @@ cimg_library::CImg<float> PointCloud::horzConnect(cimg_library::CImg<float> newI
     return vertConnect(newImage, filledCollumns, maxBlanks);
 }
 
-inline void PointCloud::convertToImage()
+inline void PointCloud::convertToImage(std::string imagePath)
 {
     std::vector<glm::vec3> points = {};
     std::map<float, std::vector<glm::vec3>> point_map = {};
@@ -495,7 +503,7 @@ inline void PointCloud::convertToImage()
     }
     
     image.save_png("heightmapRaw.png", 4);
-    CImgDisplay local(image, "heightmap");
+    CImgDisplay local(image, "heightmapRaw");
     CImg<float>  newImage;
     newImage = image;
     std::vector<int> blankRows;
@@ -510,6 +518,7 @@ inline void PointCloud::convertToImage()
         newFileName += std::to_string(maxBlanks);
         newFileName += ".png";
         newImage.save_png(newFileName.data(), 4);
+        local.display(newImage);
         std::cout << "Finished Iteration " << maxBlanks << std::endl;
         std::cout << "  Current Rows Filled = " << filledRows.size() << std::endl;
         std::cout << "  Current Cols Filled = " << filledColumns.size() << std::endl;
@@ -518,7 +527,7 @@ inline void PointCloud::convertToImage()
     CImg<float>  blurPhoto;
     blurPhoto = newImage;
     blurPhoto.blur(1);
-    blurPhoto.save_png("heightmaps/FinalHeightmap.png", 4);
+    blurPhoto.save_png(imagePath.c_str(), 4);
 
     using namespace std;
     ofstream outputFile("heightmaps/HeightmapInfo.txt");

@@ -26,7 +26,7 @@ const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
 bool wireframe = false;
-bool isTerrain = false;
+bool isTerrain = true;
 
 // camera - give pretty starting point
 Camera camera(glm::vec3(1.0f, 3.0f, 20.5f),
@@ -39,6 +39,29 @@ bool firstMouse = true;
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+
+// global objects
+Terrain* terrain;
+auto pointCloud = new PointCloud("pointcloud/island3dn.las");
+
+int main();
+
+// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
+// ---------------------------------------------------------------------------------------------------------
+void processInput(GLFWwindow *window)
+{
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        camera.ProcessKeyboard(FORWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        camera.ProcessKeyboard(BACKWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        camera.ProcessKeyboard(LEFT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        camera.ProcessKeyboard(RIGHT, deltaTime);
+}
 
 int main()
 {
@@ -55,7 +78,7 @@ int main()
 
     // glfw window creation
     // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Tesselated Terrain", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Tesselated Pointcloud Terrain", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -84,29 +107,30 @@ int main()
     // configure global opengl state
     // -----------------------------|
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE); // todo disable?
-    glDepthMask(GL_TRUE);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // todo disable?
-    glEnable(GL_BLEND); // todo disable?
+    //glEnable(GL_CULL_FACE); // todo disable?              // not needed for pointcloud //  not needed for terrain// !Destroys! Terrain
+    glDepthMask(GL_TRUE);   // todo disable?            // not needed for pointcloud // not needed for terrain // works with terrain
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);// todo disable? // not needed for pointcloud // not needed for terrain // works with terrain
+    glEnable(GL_BLEND);     // todo disable?              // not needed for pointcloud // not needed for terrain // works with terrain
     // build and compile our shader program
     // ------------------------------------
-    //Shader tessHeightMapShader("shaders/midgpuheight.vs", "shaders/gpuheight.fs");
     ShaderT tessHeightMapShader("shaders/gpuheight.vs", "shaders/gpuheight.fs",
-        "shaders/gpuheight.tcs", "shaders/gpuheight.tes");
+                                "shaders/gpuheight.tcs", "shaders/gpuheight.tes");
+    
     ShaderVF noLightShader("shaders/default.vs", "shaders/noLight.fs");
     
     //unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0); // rez 15-20, sizediv 1
     //unsigned char *data = stbi_load("heightmaps/hqheightmap.png", &width, &height, &nrChannels, 0); // rez 20-25, sizediv 2
     //unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0); // rez 20-25, sizediv 4
-	//Terrain terrain(data, width, height, nrChannels, 20, 4, &tessHeightMapShader);
+    //Terrain terrain(data, width, height, nrChannels, 20, 4, &tessHeightMapShader);
     
-    auto pointCloud = new PointCloud("pointcloud/small.las");
     pointCloud->set_shader(&noLightShader);
     pointCloud->hasData();
-    pointCloud->setup();
+    std::string path = "heightmaps/Island3Heightmap.png"; // !NB! if the las file is changed but the output imagePath/png remains, then it'll skip making a new image, thinking it's the same image
+    //!NB! Will throw a pop-up with an abort button when the image doesn't exist. That is Expected! just let it run, you'll see it start iterating over the image in the console.
+    pointCloud->setup(path);
     int width, height, nrChannels;
-    unsigned char *data = stbi_load("heightmaps/FinalHeightmap.png", &width, &height, &nrChannels, 0); 
-    Terrain terrain(data, width, height, nrChannels, 20, 2,1,1, &tessHeightMapShader); // rez 15-20, sizediv 1
+    unsigned char *data = stbi_load(path.c_str(), &width, &height, &nrChannels, 0); // rez 15-20, sizediv 1
+    terrain = new Terrain(data, width, height, nrChannels, 7, 4,4,2, &tessHeightMapShader); // rez 15-20, sizediv 1
 
     // render loop
     // -----------
@@ -137,7 +161,7 @@ int main()
         {
             noLightShader.use(); 
         }
-    	//glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+        //glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
 
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100000.0f);
@@ -147,6 +171,7 @@ int main()
         {
             tessHeightMapShader.setMat4("projection", projection);
             tessHeightMapShader.setMat4("view", view);
+            tessHeightMapShader.setFloat("heightDiv", terrain->sizeDivisorY);
         }
         else
         {
@@ -176,14 +201,14 @@ int main()
 
         if (isTerrain)
         {
-            terrain.draw();
-            float terrainHeight =terrain.getHeightAtPoint(camera.Position.x,camera.Position.z);
+            terrain->draw();
+            float terrainHeight =terrain->getHeightAtPoint(camera.Position.x,camera.Position.z);
             if(camera.Position.y < terrainHeight+1)
             {
                 std::cout << "Camera below terrain!" << std::endl;
                 camera.Position.y = terrainHeight+1;
             }
-            std::cout << "Height at (" << camera.Position.x << " " << camera.Position.z << "):" << terrain.getHeightAtPoint(camera.Position.x,camera.Position.z) << std::endl;
+            std::cout << "Height at (" << camera.Position.x << " " << camera.Position.z << "):" << terrain->getHeightAtPoint(camera.Position.x,camera.Position.z) << std::endl;
         }
         else
         {
@@ -198,30 +223,13 @@ int main()
 
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------
-    terrain.clear();
+    terrain->clear();
     stbi_image_free(data);
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
     glfwTerminate();
     return 0;
-}
-
-// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow *window)
-{
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -246,6 +254,14 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             break;
         case GLFW_KEY_T:
             isTerrain = !isTerrain;
+            if (isTerrain)
+            {
+                terrain->bind();
+            }
+            else
+            {
+                pointCloud->bind();
+            }
             break;
         }
     }

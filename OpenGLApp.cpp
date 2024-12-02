@@ -12,7 +12,9 @@
 #include <iostream>
 #include <vector>
 
+#include "NormalMap.h"
 #include "pointcloud.h"
+#include "Sphere.h"
 
 #include "Terrain.h"
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -44,6 +46,15 @@ float lastFrame = 0.0f;
 Terrain* terrain;
 auto pointCloud = new PointCloud("pointcloud/island3dn.las");
 
+//// lighting
+//glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+//// positions of the point lights
+//glm::vec3 pointLightPositions[] = {
+//    glm::vec3( 0.7f,  0.2f,  2.0f),
+//    glm::vec3( 2.3f, -3.3f, -4.0f),
+//    glm::vec3(-4.0f,  2.0f, -12.0f),
+//    glm::vec3( 0.0f,  0.0f, -3.0f)
+//};
 int main();
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
@@ -122,12 +133,18 @@ int main()
     //unsigned char *data = stbi_load("heightmaps/hqheightmap.png", &width, &height, &nrChannels, 0); // rez 20-25, sizediv 2
     //unsigned char *data = stbi_load("heightmaps/uhqheightmap.png", &width, &height, &nrChannels, 0); // rez 20-25, sizediv 4
     //Terrain terrain(data, width, height, nrChannels, 20, 4, &tessHeightMapShader);
-    
+    std::vector<Sphere> spheres;
+    //spheres.emplace_back();
+    //spheres[0].setup(2);
+    //spheres[0].set_position(glm::vec3(13,10,12));
+    //spheres[0].set_shader(&noLightShader);
     pointCloud->set_shader(&noLightShader);
     pointCloud->hasData();
     std::string path = "heightmaps/Island3Heightmap.png"; // !NB! if the las file is changed but the output imagePath/png remains, then it'll skip making a new image, thinking it's the same image
     //!NB! Will throw a pop-up with an abort button when the image doesn't exist. That is Expected! just let it run, you'll see it start iterating over the image in the console.
     pointCloud->setup(path);
+    NormalMap normal_map;
+    normal_map.create_normal_from_height(path, 2);
     int width, height, nrChannels;
     unsigned char *data = stbi_load(path.c_str(), &width, &height, &nrChannels, 0); // rez 15-20, sizediv 1
     terrain = new Terrain(data, width, height, nrChannels, 7, 4,4,2, &tessHeightMapShader); // rez 15-20, sizediv 1
@@ -214,6 +231,15 @@ int main()
         {
             pointCloud->draw();
         }
+        noLightShader.use();
+        noLightShader.setMat4("projection", projection);
+        noLightShader.setMat4("view", view);
+        noLightShader.setMat4("model", model);
+        for (int i = 0; i < spheres.size(); ++i)
+        {
+            spheres[i].draw();
+        }
+
         
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
